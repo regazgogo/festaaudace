@@ -18,14 +18,32 @@ type CreatedOrder = {
   payment_status: string;
 };
 
+type Mode = 'choice' | 'new' | 'existing';
+
 function euro(cents: number) {
   return `${(cents / 100).toFixed(0)} €`;
 }
 
+function buildAudaceCode(name: string, walletNumber: string) {
+  const cleanName = name
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z]/g, '')
+    .slice(0, 3)
+    .padEnd(3, 'X');
+
+  const cleanNumber = walletNumber.trim().replace(/[^0-9]/g, '');
+
+  return `${cleanName}-${cleanNumber}`;
+}
+
 export default function HomePage() {
+  const [mode, setMode] = useState<Mode>('choice');
   const [drinks, setDrinks] = useState<Drink[]>([]);
   const [customerName, setCustomerName] = useState('');
   const [credits, setCredits] = useState(20);
+  const [existingName, setExistingName] = useState('');
+  const [existingWalletNumber, setExistingWalletNumber] = useState('');
   const [order, setOrder] = useState<CreatedOrder | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -75,7 +93,43 @@ export default function HomePage() {
     }
   }
 
+  function openExistingWallet(event: React.FormEvent) {
+    event.preventDefault();
+    setError('');
+
+    const cleanNumber = existingWalletNumber.trim().replace(/[^0-9]/g, '');
+
+    if (!existingName.trim()) {
+      setError('Inserisci il nome');
+      return;
+    }
+
+    if (!cleanNumber || cleanNumber.length !== 4) {
+      setError('Inserisci il numero wallet di 4 cifre');
+      return;
+    }
+
+    const code = buildAudaceCode(existingName, cleanNumber);
+
+    window.location.href = `/wallet/${encodeURIComponent(code)}`;
+  }
+
   if (order) {
+    const walletNumber = order.pickup_code.split('-')[1];
+    const walletUrl =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/wallet/${order.pickup_code}`
+        : `/wallet/${order.pickup_code}`;
+
+    const whatsappText = encodeURIComponent(
+      `🍸 Festa Audace\n` +
+        `Il mio codice wallet è ${order.pickup_code}\n` +
+        `Numero wallet: ${walletNumber}\n` +
+        `Link saldo: ${walletUrl}`
+    );
+
+    const whatsappUrl = `https://wa.me/?text=${whatsappText}`;
+
     return (
       <main className="container">
         <section className="card">
@@ -90,9 +144,14 @@ export default function HomePage() {
             Dopo il pagamento, un admin controllerà e attiverà i tuoi crediti.
           </p>
 
-          <p>Il tuo codice cliente è:</p>
+          <p>Il tuo codice Audace è:</p>
 
           <div className="codeBox">{order.pickup_code}</div>
+
+          <p>
+            Ricordati soprattutto il numero wallet:{' '}
+            <strong>{walletNumber}</strong>
+          </p>
 
           <div className="paymentButtons">
             <a
@@ -118,11 +177,33 @@ export default function HomePage() {
             Quando il pagamento viene approvato, potrai usare i crediti al bar.
           </p>
 
-          <p>
-            <a href={`/wallet/${order.pickup_code}`}>Controlla il tuo saldo</a>
-          </p>
+          <div className="inlineActions">
+            <a className="actionLink" href={`/wallet/${order.pickup_code}`}>
+              Controlla il tuo saldo
+            </a>
 
-          <button onClick={() => setOrder(null)}>Crea un altro ordine</button>
+            <a
+              className="whatsappButton"
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Salvami il codice su WhatsApp
+            </a>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setOrder(null);
+              setMode('choice');
+              setCustomerName('');
+              setCredits(20);
+              setError('');
+            }}
+          >
+            Torna alla home
+          </button>
         </section>
       </main>
     );
@@ -133,50 +214,146 @@ export default function HomePage() {
       <section className="hero">
         <h1>Drink Credits</h1>
         <p>
-          Compra crediti drink, paga con Revolut o PayPal e mostra il codice al
+          Carica crediti, paga con Revolut o PayPal e mostra il codice Audace al
           bar.
         </p>
       </section>
 
-      <section className="card">
-        <h2>Compra crediti</h2>
+      {mode === 'choice' && (
+        <section className="card">
+          <h2>Che Audace sei?</h2>
 
-        <form onSubmit={createOrder}>
-          <label>
-            Nome
-            <input
-              value={customerName}
-              onChange={(event) => setCustomerName(event.target.value)}
-              placeholder="Es. Alberto"
-              required
-            />
-          </label>
+          <div className="choiceGrid">
+            <button
+              type="button"
+              className="choiceButton"
+              onClick={() => {
+                setError('');
+                setMode('new');
+              }}
+            >
+              <strong>Nuovo Audace</strong>
+              <span>Creo un nuovo wallet e carico crediti</span>
+            </button>
 
-          <label>
-            Crediti da caricare
-            <input
-              type="number"
-              min="1"
-              max="200"
-              step="1"
-              value={credits}
-              onChange={(event) => setCredits(Number(event.target.value))}
-              required
-            />
-          </label>
+            <button
+              type="button"
+              className="choiceButton"
+              onClick={() => {
+                setError('');
+                setMode('existing');
+              }}
+            >
+              <strong>Audace già bevuto</strong>
+              <span>Ho già un wallet e voglio vedere il saldo</span>
+            </button>
+          </div>
+        </section>
+      )}
 
-          <p>
-            Totale da pagare:{' '}
-            <strong>{Number.isFinite(credits) ? credits : 0} €</strong>
-          </p>
+      {mode === 'new' && (
+        <section className="card">
+          <h2>Nuovo Audace</h2>
 
-          {error && <p className="error">{error}</p>}
+          <form onSubmit={createOrder}>
+            <label>
+              Nome
+              <input
+                value={customerName}
+                onChange={(event) => setCustomerName(event.target.value)}
+                placeholder="Es. Alberto"
+                required
+              />
+            </label>
 
-          <button type="submit" disabled={loading}>
-            {loading ? 'Creazione...' : 'Crea ordine'}
-          </button>
-        </form>
-      </section>
+            <label>
+              Crediti da caricare
+              <input
+                type="number"
+                min="1"
+                max="200"
+                step="1"
+                value={credits}
+                onChange={(event) => setCredits(Number(event.target.value))}
+                required
+              />
+            </label>
+
+            <p>
+              Totale da pagare:{' '}
+              <strong>{Number.isFinite(credits) ? credits : 0} €</strong>
+            </p>
+
+            {error && <p className="error">{error}</p>}
+
+            <div className="inlineActions">
+              <button type="submit" disabled={loading}>
+                {loading ? 'Creazione...' : 'Crea wallet'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setError('');
+                  setMode('choice');
+                }}
+              >
+                Indietro
+              </button>
+            </div>
+          </form>
+        </section>
+      )}
+
+      {mode === 'existing' && (
+        <section className="card">
+          <h2>Audace già bevuto</h2>
+
+          <form onSubmit={openExistingWallet}>
+            <label>
+              Nome usato per creare il wallet
+              <input
+                value={existingName}
+                onChange={(event) => setExistingName(event.target.value)}
+                placeholder="Es. Alberto"
+                required
+              />
+            </label>
+
+            <label>
+              Numero wallet
+              <input
+                value={existingWalletNumber}
+                onChange={(event) => setExistingWalletNumber(event.target.value)}
+                placeholder="Es. 4821"
+                inputMode="numeric"
+                maxLength={4}
+                required
+              />
+            </label>
+
+            <p className="muted">
+              Esempio: Alberto + 4821 apre il wallet ALB-4821.
+            </p>
+
+            {error && <p className="error">{error}</p>}
+
+            <div className="inlineActions">
+              <button type="submit">Apri saldo</button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setError('');
+                  setMode('choice');
+                }}
+              >
+                Indietro
+              </button>
+            </div>
+          </form>
+        </section>
+      )}
 
       <section className="card">
         <h2>Menu drink</h2>
