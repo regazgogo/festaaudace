@@ -128,11 +128,26 @@ button:disabled {
 
 .dangerButton {
   background: var(--danger);
-  color: white;
+  color: #ffffff;
 }
 
 .dangerButton:hover {
   background: var(--danger-hover);
+}
+
+.dangerSmallButton {
+  background: #dc2626;
+  color: #ffffff;
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.dangerSmallButton:hover {
+  background: #991b1b;
 }
 
 .error {
@@ -181,6 +196,8 @@ button:disabled {
   font-size: 42px;
 }
 
+/* Pagamenti */
+
 .paymentButtons {
   display: flex;
   gap: 12px;
@@ -211,84 +228,41 @@ button:disabled {
   display: block;
 }
 
-.drinkGrid {
-  display: grid;
-  gap: 10px;
-}
-
-.drinkItem {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--card-2);
-  color: var(--text);
-}
-
-.drinkItem span,
-.drinkItem strong {
-  color: var(--text);
-}
-
-.adminOrders {
-  display: grid;
-  gap: 12px;
-}
-
-.adminOrder {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--card-2);
-  color: var(--text);
-}
-
-.adminOrder p,
-.adminOrder strong {
-  color: var(--text);
-}
-
-.adminActions {
-  display: flex;
-  gap: 8px;
+.whatsappButton {
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
+  background: #25d366;
+  color: #111827;
+  text-decoration: none;
+  font-weight: 900;
+  border-radius: 14px;
+  padding: 13px 18px;
 }
 
-.barGrid {
-  display: grid;
-  gap: 10px;
-  margin-top: 18px;
+.whatsappButton:hover {
+  color: #111827;
+  filter: brightness(0.95);
 }
 
-.drinkButton {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
+.actionLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: #ffffff;
   color: #111827;
-  border: 2px solid #e5e7eb;
+  text-decoration: none;
+  font-weight: 900;
+  border-radius: 14px;
+  padding: 13px 18px;
 }
 
-.drinkButton span,
-.drinkButton strong {
+.actionLink:hover {
   color: #111827;
+  filter: brightness(0.95);
 }
 
-.drinkButton:hover {
-  border-color: #60a5fa;
-}
-
-.inlineActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
+/* Home */
 
 .choiceGrid {
   display: grid;
@@ -324,47 +298,199 @@ button:disabled {
   transform: translateY(-1px);
 }
 
-.actionLink {
-  display: inline-flex;
+/* Menu drink */
+
+.drinkGrid {
+  display: grid;
+  gap: 10px;
+}
+
+.drinkItem {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card-2);
+  color: var(--text);
+}
+
+.drinkItem span,
+.drinkItem strong {
+  color: var(--text);
+}
+
+/* Admin */
+
+.adminOrders {
+  display: grid;
+  gap: 12px;
+}
+
+.adminOrder {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card-2);
+  color: var(--text);
+}
+
+.adminOrder p,
+.adminOrder strong {
+  color: var(--text);
+}
+
+.adminActions {
+  display: flex;
+  gap: 8px;
   align-items: center;
-  justify-content: center;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.statBox {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  min-height: 120px;
+}
+
+.statBox span {
+  display: block;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.statBox strong {
+  display: block;
+  color: #ffffff;
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1;
+  margin-top: auto;
+}
+
+.walletTableWrapper {
+  overflow-x: auto;
+}
+
+.walletTable {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 860px;
+}
+
+.walletTable th,
+.walletTable td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  color: var(--text);
+  vertical-align: middle;
+}
+
+.walletTable th {
+  color: var(--muted);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.walletTable td strong {
+  color: #ffffff;
+}
+
+/* Bar */
+
+.barGrid {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.drinkButton {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
   background: #ffffff;
   color: #111827;
-  text-decoration: none;
-  font-weight: 900;
-  border-radius: 14px;
-  padding: 13px 18px;
+  border: 2px solid #e5e7eb;
 }
 
-.actionLink:hover {
+.drinkButton span,
+.drinkButton strong {
   color: #111827;
-  filter: brightness(0.95);
 }
 
-.whatsappButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #25d366;
-  color: #111827;
-  text-decoration: none;
-  font-weight: 900;
-  border-radius: 14px;
-  padding: 13px 18px;
+.drinkButton:hover {
+  border-color: #60a5fa;
 }
 
-.whatsappButton:hover {
-  color: #111827;
-  filter: brightness(0.95);
+.inlineActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sectionDivider {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 26px 0;
+}
+
+/* Responsive */
+
+@media (max-width: 800px) {
+  body {
+    padding: 14px;
+  }
+
+  .statsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .adminOrder {
+    flex-direction: column;
+  }
+
+  .adminActions {
+    align-items: stretch;
+  }
+
+  .adminActions button {
+    width: 100%;
+  }
 }
 
 @media (max-width: 700px) {
   .choiceGrid {
     grid-template-columns: 1fr;
   }
-}
-.sectionDivider {
-  border: 0;
-  border-top: 1px solid var(--border);
-  margin: 26px 0;
+
+  .inlineActions {
+    flex-direction: column;
+  }
+
+  .inlineActions button,
+  .inlineActions a {
+    width: 100%;
+  }
 }

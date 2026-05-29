@@ -12,6 +12,29 @@ type PendingOrder = {
   created_at: string;
 };
 
+type WalletSummary = {
+  pickup_code: string;
+  customer_name: string;
+  approved_credits: number;
+  pending_credits: number;
+  used_credits: number;
+  available_credits: number;
+  approved_amount_cents: number;
+  pending_amount_cents: number;
+  created_at: string;
+  last_order_at: string;
+};
+
+type AdminTotals = {
+  wallets_count: number;
+  approved_credits: number;
+  pending_credits: number;
+  used_credits: number;
+  available_credits: number;
+  approved_amount_cents: number;
+  pending_amount_cents: number;
+};
+
 function euro(cents: number) {
   return `${(cents / 100).toFixed(0)} €`;
 }
@@ -19,34 +42,59 @@ function euro(cents: number) {
 export default function AdminPage() {
   const [adminPin, setAdminPin] = useState('');
   const [orders, setOrders] = useState<PendingOrder[]>([]);
+  const [wallets, setWallets] = useState<WalletSummary[]>([]);
+  const [totals, setTotals] = useState<AdminTotals | null>(null);
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function loadPendingOrders() {
+    const res = await fetch('/api/admin/pending-orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ adminPin }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Errore caricamento ordini');
+    }
+
+    setOrders(data.orders || []);
+  }
+
+  async function loadStats() {
+    const res = await fetch('/api/admin/stats', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ adminPin }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Errore caricamento statistiche');
+    }
+
+    setWallets(data.wallets || []);
+    setTotals(data.totals || null);
+  }
+
+  async function loadAdminData() {
     setError('');
     setLoading(true);
 
     try {
-      const res = await fetch('/api/admin/pending-orders', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ adminPin }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || 'Errore caricamento ordini');
-        return;
-      }
-
-      setOrders(data.orders || []);
+      await loadPendingOrders();
+      await loadStats();
       setLoaded(true);
-    } catch {
-      setError('Errore di connessione');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore di connessione');
     } finally {
       setLoading(false);
     }
@@ -70,7 +118,7 @@ export default function AdminPage() {
       return;
     }
 
-    await loadPendingOrders();
+    await loadAdminData();
   }
 
   async function cancelOrder(orderId: string) {
@@ -91,7 +139,44 @@ export default function AdminPage() {
       return;
     }
 
-    await loadPendingOrders();
+    await loadAdminData();
+  }
+
+  async function deleteWallet(pickupCode: string) {
+    setError('');
+
+    const confirmed = window.confirm(
+      `Confermi di eliminare definitivamente il wallet ${pickupCode}?\n\nQuesta operazione eliminerà ordini, ricariche e movimenti collegati.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const secondConfirm = window.confirm(
+      `Ultima conferma: vuoi davvero eliminare ${pickupCode}?`
+    );
+
+    if (!secondConfirm) {
+      return;
+    }
+
+    const res = await fetch('/api/admin/delete-wallet', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ adminPin, pickupCode }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data.error || 'Errore eliminazione wallet');
+      return;
+    }
+
+    await loadAdminData();
   }
 
   return (
@@ -109,12 +194,50 @@ export default function AdminPage() {
           />
         </label>
 
-        <button onClick={loadPendingOrders} disabled={loading}>
-          {loading ? 'Caricamento...' : 'Carica ordini in attesa'}
+        <button onClick={loadAdminData} disabled={loading}>
+          {loading ? 'Caricamento...' : 'Carica pannello admin'}
         </button>
 
         {error && <p className="error">{error}</p>}
       </section>
+
+      {loaded && totals && (
+        <section className="card">
+          <h2>Panoramica generale</h2>
+
+          <div className="statsGrid">
+            <div className="statBox">
+              <span>Wallet creati</span>
+              <strong>{totals.wallets_count}</strong>
+            </div>
+
+            <div className="statBox">
+              <span>Incassato approvato</span>
+              <strong>{euro(totals.approved_amount_cents)}</strong>
+            </div>
+
+            <div className="statBox">
+              <span>Da approvare</span>
+              <strong>{euro(totals.pending_amount_cents)}</strong>
+            </div>
+
+            <div className="statBox">
+              <span>Crediti disponibili</span>
+              <strong>{totals.available_credits}</strong>
+            </div>
+
+            <div className="statBox">
+              <span>Crediti usati</span>
+              <strong>{totals.used_credits}</strong>
+            </div>
+
+            <div className="statBox">
+              <span>Crediti in attesa</span>
+              <strong>{totals.pending_credits}</strong>
+            </div>
+          </div>
+        </section>
+      )}
 
       {loaded && (
         <section className="card">
@@ -149,6 +272,61 @@ export default function AdminPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {loaded && (
+        <section className="card">
+          <h2>Panoramica wallet</h2>
+
+          {wallets.length === 0 ? (
+            <p>Nessun wallet creato.</p>
+          ) : (
+            <div className="walletTableWrapper">
+              <table className="walletTable">
+                <thead>
+                  <tr>
+                    <th>Wallet</th>
+                    <th>Nome</th>
+                    <th>Saldo</th>
+                    <th>Usati</th>
+                    <th>Caricati</th>
+                    <th>In attesa</th>
+                    <th>Incassato</th>
+                    <th>Azioni</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {wallets.map((wallet) => (
+                    <tr key={wallet.pickup_code}>
+                      <td>
+                        <a href={`/wallet/${wallet.pickup_code}`}>
+                          {wallet.pickup_code}
+                        </a>
+                      </td>
+                      <td>{wallet.customer_name}</td>
+                      <td>
+                        <strong>{wallet.available_credits}</strong>
+                      </td>
+                      <td>{wallet.used_credits}</td>
+                      <td>{wallet.approved_credits}</td>
+                      <td>{wallet.pending_credits}</td>
+                      <td>{euro(wallet.approved_amount_cents)}</td>
+                      <td>
+                        <button
+                          className="dangerSmallButton"
+                          onClick={() => deleteWallet(wallet.pickup_code)}
+                        >
+                          Elimina
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </section>
