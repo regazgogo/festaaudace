@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 type Wallet = {
   order_id: string;
@@ -18,6 +19,8 @@ type Drink = {
 };
 
 export default function BarClient() {
+  const searchParams = useSearchParams();
+
   const [pickupCode, setPickupCode] = useState('');
   const [barPin, setBarPin] = useState('');
   const [wallet, setWallet] = useState<Wallet | null>(null);
@@ -37,6 +40,14 @@ export default function BarClient() {
 
     loadDrinks();
   }, []);
+
+  useEffect(() => {
+    const codeFromUrl = searchParams.get('code');
+
+    if (codeFromUrl) {
+      setPickupCode(codeFromUrl.toUpperCase());
+    }
+  }, [searchParams]);
 
   async function searchWallet() {
     setError('');

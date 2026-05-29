@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { QRCodeCanvas } from 'qrcode.react';
 
 type Drink = {
   id: string;
@@ -172,10 +173,14 @@ export default function HomePage() {
 
   if (order) {
     const walletNumber = order.pickup_code.split('-')[1];
-    const walletUrl =
+
+    const siteUrl =
       typeof window !== 'undefined'
-        ? `${window.location.origin}/wallet/${order.pickup_code}`
-        : `/wallet/${order.pickup_code}`;
+        ? window.location.origin
+        : process.env.NEXT_PUBLIC_SITE_URL || '';
+
+    const walletUrl = `${siteUrl}/wallet/${order.pickup_code}`;
+    const barQrUrl = `${siteUrl}/bar?code=${order.pickup_code}`;
 
     const whatsappText = encodeURIComponent(
       `🍸 Festa Audace\n` +
@@ -207,6 +212,18 @@ export default function HomePage() {
           <p>Il tuo codice Audace è:</p>
 
           <div className="codeBox">{order.pickup_code}</div>
+
+          <div className="qrBox">
+            <QRCodeCanvas
+              value={barQrUrl}
+              size={220}
+              bgColor="#ffffff"
+              fgColor="#000000"
+              level="H"
+              includeMargin
+            />
+            <p>Mostra questo QR al bar</p>
+          </div>
 
           <p>
             Ricordati soprattutto il numero wallet:{' '}
@@ -259,6 +276,9 @@ export default function HomePage() {
               setMode('choice');
               setCustomerName('');
               setCredits(20);
+              setExistingName('');
+              setExistingWalletNumber('');
+              setTopUpCredits(20);
               setError('');
             }}
           >
@@ -433,7 +453,9 @@ export default function HomePage() {
 
             <p>
               Totale ricarica:{' '}
-              <strong>{Number.isFinite(topUpCredits) ? topUpCredits : 0} €</strong>
+              <strong>
+                {Number.isFinite(topUpCredits) ? topUpCredits : 0} €
+              </strong>
             </p>
 
             <button type="submit" disabled={topUpLoading}>

@@ -16,6 +16,8 @@ type WalletResponse = {
     amount_cents: number;
     credits_purchased: number;
     credits_available: number;
+    pending_amount_cents?: number;
+    pending_credits?: number;
     created_at: string;
     paid_at: string | null;
   };
@@ -61,6 +63,11 @@ export default async function WalletPage({
 
   const wallet = data.wallet;
   const movements = data.movements || [];
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || '';
+  const barQrUrl = `${siteUrl}/bar?code=${wallet.pickup_code}`;
+  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+    barQrUrl
+  )}`;
 
   return (
     <main className="container">
@@ -77,12 +84,25 @@ export default async function WalletPage({
 
         <p>
           <strong>Stato pagamento:</strong>{' '}
-          {wallet.payment_status === 'paid' ? 'Pagato' : wallet.payment_status}
+          {wallet.payment_status === 'paid'
+            ? 'Pagato'
+            : 'In attesa di approvazione'}
         </p>
 
         <div className="balanceBox">
           <span>Crediti disponibili</span>
           <strong>{wallet.credits_available}</strong>
+        </div>
+
+        {!!wallet.pending_credits && wallet.pending_credits > 0 && (
+          <p className="muted">
+            Ricarica in attesa: {wallet.pending_credits} crediti
+          </p>
+        )}
+
+        <div className="qrBox">
+          <img src={qrImageUrl} alt={`QR wallet ${wallet.pickup_code}`} />
+          <p>Mostra questo QR al bar</p>
         </div>
 
         <p>
@@ -99,9 +119,11 @@ export default async function WalletPage({
           <ul>
             {movements.map((movement) => (
               <li key={movement.id}>
-                <strong>{movement.amount > 0 ? '+' : ''}
-                  {movement.amount} crediti</strong>{' '}
-                — {movement.note || movement.type}
+                <strong>
+                  {movement.amount > 0 ? '+' : ''}
+                  {movement.amount} crediti
+                </strong>{' '}
+                - {movement.note || movement.type}
               </li>
             ))}
           </ul>
