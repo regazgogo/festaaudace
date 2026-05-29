@@ -35,15 +35,28 @@ type AdminTotals = {
   pending_amount_cents: number;
 };
 
+function safeNumber(value: unknown) {
+  const n = Number(value || 0);
+  return Number.isFinite(n) ? n : 0;
+}
+
 function euro(cents: number) {
-  return `${(cents / 100).toFixed(0)} €`;
+  return `${(safeNumber(cents) / 100).toFixed(0)} €`;
 }
 
 export default function AdminPage() {
   const [adminPin, setAdminPin] = useState('');
   const [orders, setOrders] = useState<PendingOrder[]>([]);
   const [wallets, setWallets] = useState<WalletSummary[]>([]);
-  const [totals, setTotals] = useState<AdminTotals | null>(null);
+  const [totals, setTotals] = useState<AdminTotals>({
+    wallets_count: 0,
+    approved_credits: 0,
+    pending_credits: 0,
+    used_credits: 0,
+    available_credits: 0,
+    approved_amount_cents: 0,
+    pending_amount_cents: 0,
+  });
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -82,7 +95,15 @@ export default function AdminPage() {
     }
 
     setWallets(data.wallets || []);
-    setTotals(data.totals || null);
+    setTotals({
+      wallets_count: safeNumber(data.totals?.wallets_count),
+      approved_credits: safeNumber(data.totals?.approved_credits),
+      pending_credits: safeNumber(data.totals?.pending_credits),
+      used_credits: safeNumber(data.totals?.used_credits),
+      available_credits: safeNumber(data.totals?.available_credits),
+      approved_amount_cents: safeNumber(data.totals?.approved_amount_cents),
+      pending_amount_cents: safeNumber(data.totals?.pending_amount_cents),
+    });
   }
 
   async function loadAdminData() {
@@ -201,14 +222,14 @@ export default function AdminPage() {
         {error && <p className="error">{error}</p>}
       </section>
 
-      {loaded && totals && (
+      {loaded && (
         <section className="card">
           <h2>Panoramica generale</h2>
 
           <div className="statsGrid">
             <div className="statBox">
               <span>Wallet creati</span>
-              <strong>{totals.wallets_count}</strong>
+              <strong>{safeNumber(totals.wallets_count)}</strong>
             </div>
 
             <div className="statBox">
@@ -223,17 +244,17 @@ export default function AdminPage() {
 
             <div className="statBox">
               <span>Crediti disponibili</span>
-              <strong>{totals.available_credits}</strong>
+              <strong>{safeNumber(totals.available_credits)}</strong>
             </div>
 
             <div className="statBox">
               <span>Crediti usati</span>
-              <strong>{totals.used_credits}</strong>
+              <strong>{safeNumber(totals.used_credits)}</strong>
             </div>
 
             <div className="statBox">
               <span>Crediti in attesa</span>
-              <strong>{totals.pending_credits}</strong>
+              <strong>{safeNumber(totals.pending_credits)}</strong>
             </div>
           </div>
         </section>
@@ -254,7 +275,7 @@ export default function AdminPage() {
                     <p>Codice: {order.pickup_code}</p>
                     <p>
                       Importo: {euro(order.amount_cents)} - Crediti:{' '}
-                      {order.credits_purchased}
+                      {safeNumber(order.credits_purchased)}
                     </p>
                   </div>
 
@@ -309,11 +330,11 @@ export default function AdminPage() {
                       </td>
                       <td>{wallet.customer_name}</td>
                       <td>
-                        <strong>{wallet.available_credits}</strong>
+                        <strong>{safeNumber(wallet.available_credits)}</strong>
                       </td>
-                      <td>{wallet.used_credits}</td>
-                      <td>{wallet.approved_credits}</td>
-                      <td>{wallet.pending_credits}</td>
+                      <td>{safeNumber(wallet.used_credits)}</td>
+                      <td>{safeNumber(wallet.approved_credits)}</td>
+                      <td>{safeNumber(wallet.pending_credits)}</td>
                       <td>{euro(wallet.approved_amount_cents)}</td>
                       <td>
                         <button
