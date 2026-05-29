@@ -14,17 +14,28 @@ function generatePickupCode(name: string) {
   return `${cleanName}-${random}`;
 }
 
+function buildPickupCode(name: string, walletNumber: string) {
+  const cleanName = name
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z]/g, '')
+    .slice(0, 3)
+    .padEnd(3, 'X');
+
+  const cleanNumber = walletNumber.trim().replace(/[^0-9]/g, '');
+
+  return `${cleanName}-${cleanNumber}`;
+}
+
 export async function POST(request: Request) {
   const body = await request.json();
 
   const customerName = String(body.customerName || '').trim();
   const credits = Number(body.credits || 0);
+  const existingWalletNumber = String(body.existingWalletNumber || '').trim();
 
   if (!customerName) {
-    return NextResponse.json(
-      { error: 'Nome obbligatorio' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'Nome obbligatorio' }, { status: 400 });
   }
 
   if (!Number.isInteger(credits) || credits < 1 || credits > 200) {
@@ -36,20 +47,58 @@ export async function POST(request: Request) {
 
   const amountCents = credits * 100;
 
-  let pickupCode = generatePickupCode(customerName);
+  let pickupCode = '';
 
-  for (let i = 0; i < 10; i++) {
-    const { data: existing } = await supabaseAdmin
-      .from('orders')
-      .select('id')
-      .eq('pickup_code', pickupCode)
-      .maybeSingle();
+  if (existingWalletNumber) {
+    const cleanNumber = existingWalletNumber.replace(/[^0-9]/g, '');
 
-    if (!existing) {
-      break;
+    if (cleanNumber.length !== 4) {
+      return NextResponse.json(
+        { error: 'Il numero wallet deve avere 4 cifre' },
+        { status: 400 }
+      );
     }
 
+    pickupCode = buildPickupCode(customerName, cleanNumber);
+
+    const { data: existingWallet, error: existingWalletError } =
+      await supabaseAdmin
+        .from('orders')
+        .select('id,pickup_code,payment_status')
+        .eq('pickup_code', pickupCode)
+        .eq('payment_status', 'paid')
+        .limit(1)
+        .maybeSingle();
+
+    if (existingWalletError) {
+      return NextResponse.json(
+        { error: existingWalletError.message },
+        { status: 500 }
+      );
+    }
+
+    if (!existingWallet) {
+      return NextResponse.json(
+        { error: 'Wallet non trovato o non ancora approvato' },
+        { status: 404 }
+      );
+    }
+  } else {
     pickupCode = generatePickupCode(customerName);
+
+    for (let i = 0; i < 10; i++) {
+      const { data: existing } = await supabaseAdmin
+        .from('orders')
+        .select('id')
+        .eq('pickup_code', pickupCode)
+        .maybeSingle();
+
+      if (!existing) {
+        break;
+      }
+
+      pickupCode = generatePickupCode(customerName);
+    }
   }
 
   const { data: order, error: orderError } = await supabaseAdmin

@@ -40,12 +40,19 @@ function buildAudaceCode(name: string, walletNumber: string) {
 export default function HomePage() {
   const [mode, setMode] = useState<Mode>('choice');
   const [drinks, setDrinks] = useState<Drink[]>([]);
+
   const [customerName, setCustomerName] = useState('');
   const [credits, setCredits] = useState(20);
+
   const [existingName, setExistingName] = useState('');
   const [existingWalletNumber, setExistingWalletNumber] = useState('');
+  const [topUpCredits, setTopUpCredits] = useState(20);
+
   const [order, setOrder] = useState<CreatedOrder | null>(null);
+  const [orderType, setOrderType] = useState<'new' | 'topup'>('new');
+
   const [loading, setLoading] = useState(false);
+  const [topUpLoading, setTopUpLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -85,6 +92,7 @@ export default function HomePage() {
         return;
       }
 
+      setOrderType('new');
       setOrder(data.order);
     } catch {
       setError('Errore di connessione');
@@ -114,6 +122,54 @@ export default function HomePage() {
     window.location.href = `/wallet/${encodeURIComponent(code)}`;
   }
 
+  async function topUpExistingWallet(event: React.FormEvent) {
+    event.preventDefault();
+    setError('');
+    setTopUpLoading(true);
+
+    const cleanNumber = existingWalletNumber.trim().replace(/[^0-9]/g, '');
+
+    if (!existingName.trim()) {
+      setError('Inserisci il nome');
+      setTopUpLoading(false);
+      return;
+    }
+
+    if (!cleanNumber || cleanNumber.length !== 4) {
+      setError('Inserisci il numero wallet di 4 cifre');
+      setTopUpLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/manual-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customerName: existingName,
+          existingWalletNumber: cleanNumber,
+          credits: topUpCredits,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Errore durante la ricarica wallet');
+        return;
+      }
+
+      setOrderType('topup');
+      setOrder(data.order);
+    } catch {
+      setError('Errore di connessione');
+    } finally {
+      setTopUpLoading(false);
+    }
+  }
+
   if (order) {
     const walletNumber = order.pickup_code.split('-')[1];
     const walletUrl =
@@ -133,7 +189,11 @@ export default function HomePage() {
     return (
       <main className="container">
         <section className="card">
-          <h1>Pagamento in attesa</h1>
+          <h1>
+            {orderType === 'topup'
+              ? 'Ricarica in attesa'
+              : 'Pagamento in attesa'}
+          </h1>
 
           <p>
             Invia <strong>{euro(order.amount_cents)}</strong> tramite Revolut o
@@ -245,7 +305,7 @@ export default function HomePage() {
               }}
             >
               <strong>Audace già bevuto</strong>
-              <span>Ho già un wallet e voglio vedere il saldo</span>
+              <span>Ho già un wallet e voglio vedere o ricaricare il saldo</span>
             </button>
           </div>
         </section>
@@ -351,6 +411,34 @@ export default function HomePage() {
                 Indietro
               </button>
             </div>
+          </form>
+
+          <hr className="sectionDivider" />
+
+          <h3>Ricarica questo wallet</h3>
+
+          <form onSubmit={topUpExistingWallet}>
+            <label>
+              Crediti da aggiungere
+              <input
+                type="number"
+                min="1"
+                max="200"
+                step="1"
+                value={topUpCredits}
+                onChange={(event) => setTopUpCredits(Number(event.target.value))}
+                required
+              />
+            </label>
+
+            <p>
+              Totale ricarica:{' '}
+              <strong>{Number.isFinite(topUpCredits) ? topUpCredits : 0} €</strong>
+            </p>
+
+            <button type="submit" disabled={topUpLoading}>
+              {topUpLoading ? 'Creazione ricarica...' : 'Ricarica wallet'}
+            </button>
           </form>
         </section>
       )}

@@ -363,3 +363,8 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
+.sectionDivider {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 26px 0;
+}

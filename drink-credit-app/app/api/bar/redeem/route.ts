@@ -1,41 +1,84 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
-export async function POST(req: Request) {
-  try {
-    const { pickupCode, drinkId, barPin } = await req.json();
-    if (barPin !== process.env.BAR_PIN) {
-      return NextResponse.json({ error: 'PIN bar errato' }, { status: 401 });
-    }
-    if (!pickupCode || !drinkId) {
-      return NextResponse.json({ error: 'Codice e drink obbligatori' }, { status: 400 });
-    }
+export async function POST(request: Request) {
+  const body = await request.json();
 
-    const code = String(pickupCode).trim().toUpperCase();
+  const pickupCode = String(body.pickupCode || '').trim().toUpperCase();
+  const drinkId = String(body.drinkId || '').trim();
+  const barPin = String(body.barPin || '');
 
-    const { data: wallet } = await supabaseAdmin
-      .from('order_credit_balances')
-      .select('*')
-      .eq('pickup_code', code)
-      .maybeSingle();
+  if (barPin !== process.env.BAR_PIN) {
+    return NextResponse.json({ error: 'PIN bar non valido' }, { status: 401 });
+  }
 
-    if (!wallet) return NextResponse.json({ error: 'Codice non trovato' }, { status: 404 });
-    if (wallet.payment_status !== 'paid') return NextResponse.json({ error: 'Ordine non pagato' }, { status: 400 });
+  if (!pickupCode || !drinkId) {
+    return NextResponse.json(
+      { error: 'Codice cliente e drink obbligatori' },
+      { status: 400 }
+    );
+  }
 
-    const { data: drink } = await supabaseAdmin
-      .from('drinks')
-      .select('*')
-      .eq('id', drinkId)
-      .eq('active', true)
-      .single();
+  const { data: drink, error: drinkError } = await supabaseAdmin
+    .from('drinks')
+    .select('id,name,price_credits,active')
+    .eq('id', drinkId)
+    .eq('active', true)
+    .maybeSingle();
 
-    if (!drink) return NextResponse.json({ error: 'Drink non trovato' }, { status: 404 });
-    if (wallet.credits_available < drink.price_credits) {
-      return NextResponse.json({ error: `Crediti insufficienti: saldo ${wallet.credits_available}` }, { status: 400 });
-    }
+  if (drinkError || !drink) {
+    return NextResponse.json({ error: 'Drink non trovato' }, { status: 404 });
+  }
 
-    const { error } = await supabaseAdmin.from('credit_movements').insert({
-      order_id: wallet.order_id,
+  const { data: paidOrders, error: ordersError } = await supabaseAdmin
+    .from('orders')
+    .select('id,customer_name,pickup_code,payment_status,created_at')
+    .eq('pickup_code', pickupCode)
+    .eq('payment_status', 'paid')
+    .order('created_at', { ascending: true });
+
+  if (ordersError) {
+    return NextResponse.json({ error: ordersError.message }, { status: 500 });
+  }
+
+  if (!paidOrders || paidOrders.length === 0) {
+    return NextResponse.json(
+      { error: 'Wallet non trovato o non ancora approvato' },
+      { status: 404 }
+    );
+  }
+
+  const orderIds = paidOrders.map((order) => order.id);
+
+  const { data: movements, error: movementsError } = await supabaseAdmin
+    .from('credit_movements')
+    .select('amount')
+    .in('order_id', orderIds);
+
+  if (movementsError) {
+    return NextResponse.json(
+      { error: movementsError.message },
+      { status: 500 }
+    );
+  }
+
+  const creditsAvailable = (movements || []).reduce((total, movement) => {
+    return total + Number(movement.amount || 0);
+  }, 0);
+
+  if (creditsAvailable < drink.price_credits) {
+    return NextResponse.json(
+      { error: 'Crediti insufficienti' },
+      { status: 400 }
+    );
+  }
+
+  const mainOrder = paidOrders[0];
+
+  const { error: insertError } = await supabaseAdmin
+    .from('credit_movements')
+    .insert({
+      order_id: mainOrder.id,
       type: 'redeem',
       amount: -drink.price_credits,
       drink_id: drink.id,
@@ -43,10 +86,9 @@ export async function POST(req: Request) {
       created_by: 'bar',
     });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-    return NextResponse.json({ ok: true, newBalance: wallet.credits_available - drink.price_credits });
-  } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Errore scarico' }, { status: 500 });
+  if (insertError) {
+    return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
+
+  return NextResponse.json({ ok: true });
 }
