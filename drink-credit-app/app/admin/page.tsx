@@ -69,6 +69,9 @@ export default function AdminPage() {
   async function loadAdminData() {
     setError('');
     setMessage('');
+    setCreatedWalletCode('');
+    setLoaded(false);
+    setData(null);
     setLoading(true);
 
     try {
@@ -80,19 +83,33 @@ export default function AdminPage() {
         body: JSON.stringify({ adminPin }),
       });
 
-      const json = await res.json();
+      const text = await res.text();
+
+      let json: AdminData & { error?: string } = {};
+
+      try {
+        json = text ? JSON.parse(text) : {};
+      } catch {
+        setError(`Risposta non valida da /api/admin/stats: ${text}`);
+        setLoaded(false);
+        setData(null);
+        return;
+      }
 
       if (!res.ok) {
-        setError(json.error || 'Errore caricamento admin');
+        setError(json.error || `Errore caricamento admin: HTTP ${res.status}`);
         setLoaded(false);
+        setData(null);
         return;
       }
 
       setData(json);
       setLoaded(true);
-    } catch {
-      setError('Errore di connessione');
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : 'Errore di connessione');
       setLoaded(false);
+      setData(null);
     } finally {
       setLoading(false);
     }
@@ -119,21 +136,39 @@ export default function AdminPage() {
         }),
       });
 
-      const json = await res.json();
+      const text = await res.text();
 
-      if (!res.ok) {
-        setError(json.error || 'Errore creazione wallet');
+      let json: {
+        ok?: boolean;
+        error?: string;
+        order?: {
+          pickup_code: string;
+        };
+      } = {};
+
+      try {
+        json = text ? JSON.parse(text) : {};
+      } catch {
+        setError(`Risposta non valida da /api/admin/create-wallet: ${text}`);
         return;
       }
 
-      setCreatedWalletCode(json.order.pickup_code);
-      setMessage(`Wallet creato: ${json.order.pickup_code}`);
+      if (!res.ok) {
+        setError(json.error || `Errore creazione wallet: HTTP ${res.status}`);
+        return;
+      }
+
+      const pickupCode = json.order?.pickup_code || '';
+
+      setCreatedWalletCode(pickupCode);
+      setMessage(`Wallet creato: ${pickupCode}`);
       setNewWalletName('');
       setNewWalletType('giornata_intera');
 
       await loadAdminData();
-    } catch {
-      setError('Errore di connessione');
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : 'Errore di connessione');
     } finally {
       setCreatingWallet(false);
     }
@@ -156,17 +191,27 @@ export default function AdminPage() {
         }),
       });
 
-      const json = await res.json();
+      const text = await res.text();
+
+      let json: { error?: string } = {};
+
+      try {
+        json = text ? JSON.parse(text) : {};
+      } catch {
+        setError(`Risposta non valida da /api/admin/approve-order: ${text}`);
+        return;
+      }
 
       if (!res.ok) {
-        setError(json.error || 'Errore approvazione ordine');
+        setError(json.error || `Errore approvazione ordine: HTTP ${res.status}`);
         return;
       }
 
       setMessage('Ordine approvato');
       await loadAdminData();
-    } catch {
-      setError('Errore di connessione');
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : 'Errore di connessione');
     } finally {
       setActionLoading('');
     }
@@ -195,17 +240,27 @@ export default function AdminPage() {
         }),
       });
 
-      const json = await res.json();
+      const text = await res.text();
+
+      let json: { error?: string } = {};
+
+      try {
+        json = text ? JSON.parse(text) : {};
+      } catch {
+        setError(`Risposta non valida da /api/admin/cancel-order: ${text}`);
+        return;
+      }
 
       if (!res.ok) {
-        setError(json.error || 'Errore annullamento ordine');
+        setError(json.error || `Errore annullamento ordine: HTTP ${res.status}`);
         return;
       }
 
       setMessage('Ordine annullato');
       await loadAdminData();
-    } catch {
-      setError('Errore di connessione');
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : 'Errore di connessione');
     } finally {
       setActionLoading('');
     }
@@ -244,17 +299,27 @@ export default function AdminPage() {
         }),
       });
 
-      const json = await res.json();
+      const text = await res.text();
+
+      let json: { error?: string } = {};
+
+      try {
+        json = text ? JSON.parse(text) : {};
+      } catch {
+        setError(`Risposta non valida da /api/admin/delete-wallet: ${text}`);
+        return;
+      }
 
       if (!res.ok) {
-        setError(json.error || 'Errore eliminazione wallet');
+        setError(json.error || `Errore eliminazione wallet: HTTP ${res.status}`);
         return;
       }
 
       setMessage(`Wallet eliminato: ${pickupCode}`);
       await loadAdminData();
-    } catch {
-      setError('Errore di connessione');
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : 'Errore di connessione');
     } finally {
       setActionLoading('');
     }
@@ -460,7 +525,9 @@ export default function AdminPage() {
                         </td>
                         <td>{safeNumber(wallet.credits_purchased)}</td>
                         <td>
-                          <strong>{safeNumber(wallet.credits_available)}</strong>
+                          <strong>
+                            {safeNumber(wallet.credits_available)}
+                          </strong>
                         </td>
                         <td>
                           {safeNumber(wallet.pending_credits) > 0
