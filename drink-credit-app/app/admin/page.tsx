@@ -432,8 +432,13 @@ export default function AdminPage() {
         <div className="inlineActions">
           <input
             type="password"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            autoComplete="one-time-code"
             value={adminPin}
-            onChange={(event) => setAdminPin(event.target.value)}
+            onChange={(event) =>
+              setAdminPin(event.target.value.replace(/[^0-9]/g, ''))
+            }
             placeholder="PIN admin"
           />
 

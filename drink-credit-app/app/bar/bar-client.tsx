@@ -338,8 +338,13 @@ export default function BarClient() {
 
           <input
             type="password"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            autoComplete="one-time-code"
             value={barPin}
-            onChange={(event) => setBarPin(event.target.value)}
+            onChange={(event) =>
+              setBarPin(event.target.value.replace(/[^0-9]/g, ''))
+            }
             placeholder="PIN bar"
           />
 

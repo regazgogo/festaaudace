@@ -533,3 +533,133 @@ button:disabled {
 .createdWalletBox {
   margin-top: 18px;
 }
+
+.tableWrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 14px;
+}
+
+.walletTable {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.walletTable th,
+.walletTable td {
+  white-space: nowrap;
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.walletTable th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.walletTable td {
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 640px) {
+  .container {
+    width: 100%;
+    max-width: 100%;
+    padding: 14px 10px 32px;
+    overflow-x: hidden;
+  }
+
+  .hero {
+    padding: 0 4px;
+  }
+
+  .hero h1 {
+    font-size: 28px;
+    line-height: 1.1;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 100%;
+    padding: 16px;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .inlineActions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .inlineActions input,
+  .inlineActions button,
+  .inlineActions a {
+    width: 100%;
+  }
+
+  input,
+  select,
+  button {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .statsGrid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .statBox {
+    padding: 16px;
+  }
+
+  .statBox span {
+    font-size: 11px;
+  }
+
+  .statBox strong {
+    font-size: 28px;
+  }
+
+  .tableWrap {
+    margin-top: 12px;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+  }
+
+  .walletTable {
+    min-width: 720px;
+    font-size: 13px;
+  }
+
+  .walletTable th,
+  .walletTable td {
+    padding: 10px 12px;
+  }
+
+  .dangerSmallButton {
+    padding: 8px 10px;
+    font-size: 12px;
+    border-radius: 10px;
+  }
+
+  .qrBox {
+    width: 100%;
+  }
+
+  .paymentButtons {
+    flex-direction: column;
+  }
+
+  .paymentButton {
+    width: 100%;
+  }
+}
