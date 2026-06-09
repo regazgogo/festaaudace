@@ -529,3 +529,7 @@ button:disabled {
 .freeDrinkButton strong {
   color: #111827;
 }
+
+.createdWalletBox {
+  margin-top: 18px;
+}

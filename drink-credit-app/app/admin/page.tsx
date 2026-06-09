@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { QRCodeCanvas } from 'qrcode.react';
 
 type PendingOrder = {
   id: string;
@@ -19,6 +20,8 @@ type WalletRow = {
   amount_cents?: number;
   credits_purchased?: number;
   credits_available?: number;
+  included_credits_available?: number;
+  paid_credits_available?: number;
   pending_credits?: number;
   pending_amount_cents?: number;
   created_at?: string;
@@ -52,6 +55,8 @@ function euro(cents: unknown) {
 }
 
 export default function AdminPage() {
+  const qrCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
   const [adminPin, setAdminPin] = useState('');
   const [data, setData] = useState<AdminData | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -69,7 +74,6 @@ export default function AdminPage() {
   async function loadAdminData() {
     setError('');
     setMessage('');
-    setCreatedWalletCode('');
     setLoaded(false);
     setData(null);
     setLoading(true);
@@ -113,6 +117,91 @@ export default function AdminPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function getCreatedWalletUrls() {
+    const siteUrl =
+      typeof window !== 'undefined'
+        ? window.location.origin
+        : process.env.NEXT_PUBLIC_SITE_URL || '';
+
+    const walletUrl = `${siteUrl}/wallet/${createdWalletCode}`;
+    const barQrUrl = `${siteUrl}/bar?code=${createdWalletCode}`;
+
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(
+      barQrUrl
+    )}`;
+
+    return {
+      walletUrl,
+      barQrUrl,
+      qrImageUrl,
+    };
+  }
+
+  function shareWalletWhatsapp() {
+    if (!createdWalletCode) {
+      return;
+    }
+
+    const walletNumber = createdWalletCode.split('-')[1];
+    const { walletUrl, qrImageUrl } = getCreatedWalletUrls();
+
+    const whatsappText = encodeURIComponent(
+      `🍸 FESTA AUDACE\n` +
+        `Il mio codice wallet è ${createdWalletCode}\n` +
+        `Numero wallet: ${walletNumber}\n\n` +
+        `Link saldo:\n${walletUrl}\n\n` +
+        `QR code da mostrare al bar:\n${qrImageUrl}`
+    );
+
+    window.open(`https://wa.me/?text=${whatsappText}`, '_blank');
+  }
+
+  async function shareQrPng() {
+    const canvas = qrCanvasRef.current;
+    const pickupCode = createdWalletCode;
+
+    if (!pickupCode) {
+      alert('Nessun wallet creato');
+      return;
+    }
+
+    if (!canvas) {
+      alert('QR non ancora pronto');
+      return;
+    }
+
+    canvas.toBlob(async (blob) => {
+      if (!blob) {
+        alert('Impossibile creare il PNG del QR');
+        return;
+      }
+
+      const file = new File([blob], `festa-audace-${pickupCode}.png`, {
+        type: 'image/png',
+      });
+
+      const shareData = {
+        title: 'FESTA AUDACE - QR Wallet',
+        text: `QR wallet ${pickupCode}`,
+        files: [file],
+      };
+
+      if (navigator.canShare && navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+        return;
+      }
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+
+      link.href = url;
+      link.download = `festa-audace-${pickupCode}.png`;
+      link.click();
+
+      URL.revokeObjectURL(url);
+    }, 'image/png');
   }
 
   async function createWallet(event: React.FormEvent) {
@@ -160,12 +249,13 @@ export default function AdminPage() {
 
       const pickupCode = json.order?.pickup_code || '';
 
-      setCreatedWalletCode(pickupCode);
-      setMessage(`Wallet creato: ${pickupCode}`);
       setNewWalletName('');
       setNewWalletType('giornata_intera');
 
       await loadAdminData();
+
+      setCreatedWalletCode(pickupCode);
+      setMessage(`Wallet creato: ${pickupCode}`);
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : 'Errore di connessione');
@@ -379,9 +469,9 @@ export default function AdminPage() {
                   onChange={(event) => setNewWalletType(event.target.value)}
                 >
                   <option value="giornata_intera">
-                    Giornata Intera - 20 crediti
+                    Giornata Intera - 20 crediti FREE
                   </option>
-                  <option value="post_cena">Post Cena - 5 crediti</option>
+                  <option value="post_cena">Post Cena - 5 crediti FREE</option>
                 </select>
               </label>
 
@@ -391,9 +481,44 @@ export default function AdminPage() {
             </form>
 
             {createdWalletCode && (
-              <p className="success">
-                Wallet creato: <strong>{createdWalletCode}</strong>
-              </p>
+              <div className="createdWalletBox">
+                <p className="success">
+                  Wallet creato: <strong>{createdWalletCode}</strong>
+                </p>
+
+                <div className="qrBox">
+                  <QRCodeCanvas
+                    ref={qrCanvasRef}
+                    value={getCreatedWalletUrls().barQrUrl}
+                    size={220}
+                    bgColor="#ffffff"
+                    fgColor="#000000"
+                    level="H"
+                    includeMargin
+                  />
+
+                  <p>QR da mostrare al bar</p>
+                </div>
+
+                <div className="inlineActions">
+                  <a
+                    className="actionLink"
+                    href={`/wallet/${createdWalletCode}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Apri saldo wallet
+                  </a>
+
+                  <button type="button" onClick={shareWalletWhatsapp}>
+                    Condividi link WhatsApp
+                  </button>
+
+                  <button type="button" onClick={shareQrPng}>
+                    Condividi QR PNG
+                  </button>
+                </div>
+              </div>
             )}
           </section>
 
