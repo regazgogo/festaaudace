@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { sendPushoverNotification } from '@/lib/pushover';
 
 function generatePickupCode(name: string) {
   const cleanName = name
@@ -40,6 +41,9 @@ export async function POST(request: Request) {
   }
 
   const credits = walletType === 'giornata_intera' ? 20 : 5;
+
+  const walletTypeLabel =
+    walletType === 'giornata_intera' ? 'Giornata Intera' : 'Post Cena';
 
   const note =
     walletType === 'giornata_intera'
@@ -95,6 +99,17 @@ export async function POST(request: Request) {
   if (movementError) {
     return NextResponse.json({ error: movementError.message }, { status: 500 });
   }
+
+  await sendPushoverNotification({
+    title: 'FESTA AUDACE - Wallet creato',
+    message:
+      `Wallet creato da admin\n` +
+      `Nome: ${order.customer_name}\n` +
+      `Codice: ${order.pickup_code}\n` +
+      `Tipo: ${walletTypeLabel}\n` +
+      `Crediti FREE: ${credits}`,
+    priority: 0,
+  });
 
   return NextResponse.json({
     ok: true,

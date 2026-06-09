@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { sendPushoverNotification } from '@/lib/pushover';
 
 type MovementRow = {
   id: string;
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
 
   const { data: paidOrders, error: ordersError } = await supabaseAdmin
     .from('orders')
-    .select('id,pickup_code,payment_status')
+    .select('id,pickup_code,payment_status,customer_name')
     .eq('pickup_code', pickupCode)
     .eq('payment_status', 'paid');
 
@@ -45,6 +46,7 @@ export async function POST(request: Request) {
     );
   }
 
+  const customerName = paidOrders[0]?.customer_name || '';
   const orderIds = paidOrders.map((order) => order.id);
 
   const { data: movements, error: movementsError } = await supabaseAdmin
@@ -98,12 +100,14 @@ export async function POST(request: Request) {
   const undoType =
     lastRedeemToUndo.type === 'redeem_free' ? 'undo_free' : 'undo';
 
+  const restoredCredits = Math.abs(Number(lastRedeemToUndo.amount || 0));
+
   const { error: insertError } = await supabaseAdmin
     .from('credit_movements')
     .insert({
       order_id: lastRedeemToUndo.order_id,
       type: undoType,
-      amount: Math.abs(Number(lastRedeemToUndo.amount || 0)),
+      amount: restoredCredits,
       drink_id: lastRedeemToUndo.drink_id,
       note: `Annullamento: ${
         lastRedeemToUndo.note || 'scarico drink'
@@ -114,6 +118,18 @@ export async function POST(request: Request) {
   if (insertError) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
+
+  await sendPushoverNotification({
+    title: 'FESTA AUDACE - Scarico annullato',
+    message:
+      `Annullamento movimento bar\n` +
+      `Nome: ${customerName || '-'}\n` +
+      `Codice: ${pickupCode}\n` +
+      `Movimento annullato: ${lastRedeemToUndo.note || 'scarico drink'}\n` +
+      `Crediti ripristinati: ${restoredCredits}\n` +
+      `Tipo: ${undoType === 'undo_free' ? 'FREE' : 'ricaricati'}`,
+    priority: 0,
+  });
 
   return NextResponse.json({
     ok: true,

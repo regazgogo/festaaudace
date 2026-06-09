@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { sendPushoverNotification } from '@/lib/pushover';
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -16,72 +17,76 @@ export async function POST(request: Request) {
 
   if (!orderId) {
     return NextResponse.json(
-      { error: 'Ordine mancante' },
+      { error: 'ID ordine mancante' },
       { status: 400 }
     );
   }
 
-  const { data: order, error: orderError } = await supabaseAdmin
+  const { data: order, error: orderReadError } = await supabaseAdmin
     .from('orders')
-    .select('id,credits_purchased,payment_status')
+    .select(
+      'id,customer_name,pickup_code,payment_status,amount_cents,credits_purchased'
+    )
     .eq('id', orderId)
     .maybeSingle();
 
-  if (orderError || !order) {
-    return NextResponse.json(
-      { error: 'Ordine non trovato' },
-      { status: 404 }
-    );
+  if (orderReadError) {
+    return NextResponse.json({ error: orderReadError.message }, { status: 500 });
   }
 
-  if (order.payment_status === 'paid') {
-    return NextResponse.json({ ok: true });
+  if (!order) {
+    return NextResponse.json({ error: 'Ordine non trovato' }, { status: 404 });
   }
 
   if (order.payment_status !== 'pending') {
     return NextResponse.json(
-      { error: 'Questo ordine non è più in attesa' },
+      { error: 'Ordine già gestito o non in attesa' },
       { status: 400 }
     );
   }
+
+  const paidAt = new Date().toISOString();
 
   const { error: updateError } = await supabaseAdmin
     .from('orders')
     .update({
       payment_status: 'paid',
-      paid_at: new Date().toISOString(),
+      paid_at: paidAt,
     })
-    .eq('id', orderId);
+    .eq('id', orderId)
+    .eq('payment_status', 'pending');
 
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
-  const { data: existingMovement } = await supabaseAdmin
+  const { error: movementError } = await supabaseAdmin
     .from('credit_movements')
-    .select('id')
-    .eq('order_id', orderId)
-    .eq('type', 'purchase')
-    .maybeSingle();
+    .insert({
+      order_id: order.id,
+      type: 'purchase',
+      amount: Number(order.credits_purchased || 0),
+      note: 'Ricarica wallet approvata da admin',
+      created_by: 'admin',
+    });
 
-  if (!existingMovement) {
-    const { error: movementError } = await supabaseAdmin
-      .from('credit_movements')
-      .insert({
-        order_id: orderId,
-        type: 'purchase',
-        amount: order.credits_purchased,
-        note: 'Pagamento approvato manualmente',
-        created_by: 'admin',
-      });
-
-    if (movementError) {
-      return NextResponse.json(
-        { error: movementError.message },
-        { status: 500 }
-      );
-    }
+  if (movementError) {
+    return NextResponse.json({ error: movementError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true });
+  await sendPushoverNotification({
+    title: 'FESTA AUDACE - Ricarica approvata',
+    message:
+      `Ricarica approvata\n` +
+      `Nome: ${order.customer_name}\n` +
+      `Codice: ${order.pickup_code}\n` +
+      `Crediti: ${order.credits_purchased}\n` +
+      `Importo: ${(Number(order.amount_cents || 0) / 100).toFixed(0)} €`,
+    priority: 0,
+  });
+
+  return NextResponse.json({
+    ok: true,
+    orderId,
+  });
 }

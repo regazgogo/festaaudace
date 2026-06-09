@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { sendPushoverNotification } from '@/lib/pushover';
 
 function generatePickupCode(name: string) {
   const cleanName = name
@@ -119,6 +120,17 @@ export async function POST(request: Request) {
   if (orderError) {
     return NextResponse.json({ error: orderError.message }, { status: 500 });
   }
+
+  await sendPushoverNotification({
+    title: 'FESTA AUDACE - Richiesta ricarica',
+    message:
+      `Nuova richiesta ricarica wallet\n` +
+      `Nome: ${order.customer_name}\n` +
+      `Codice: ${order.pickup_code}\n` +
+      `Crediti richiesti: ${order.credits_purchased}\n` +
+      `Importo: ${(Number(order.amount_cents || 0) / 100).toFixed(0)} €`,
+    priority: 0,
+  });
 
   return NextResponse.json({
     order,

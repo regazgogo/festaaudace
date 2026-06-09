@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { sendPushoverNotification } from '@/lib/pushover';
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -23,24 +24,19 @@ export async function POST(request: Request) {
 
   const { data: orders, error: ordersError } = await supabaseAdmin
     .from('orders')
-    .select('id,pickup_code')
+    .select('id,pickup_code,customer_name')
     .eq('pickup_code', pickupCode);
 
   if (ordersError) {
-    return NextResponse.json(
-      { error: ordersError.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: ordersError.message }, { status: 500 });
   }
 
   if (!orders || orders.length === 0) {
-    return NextResponse.json(
-      { error: 'Wallet non trovato' },
-      { status: 404 }
-    );
+    return NextResponse.json({ error: 'Wallet non trovato' }, { status: 404 });
   }
 
   const orderIds = orders.map((order) => order.id);
+  const customerName = orders[0]?.customer_name || '';
 
   const { error: movementsDeleteError } = await supabaseAdmin
     .from('credit_movements')
@@ -60,11 +56,17 @@ export async function POST(request: Request) {
     .eq('pickup_code', pickupCode);
 
   if (ordersDeleteError) {
-    return NextResponse.json(
-      { error: ordersDeleteError.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: ordersDeleteError.message }, { status: 500 });
   }
+
+  await sendPushoverNotification({
+    title: 'FESTA AUDACE - Wallet eliminato',
+    message:
+      `Wallet eliminato da admin\n` +
+      `Nome: ${customerName || '-'}\n` +
+      `Codice: ${pickupCode}`,
+    priority: 1,
+  });
 
   return NextResponse.json({
     ok: true,

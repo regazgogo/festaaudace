@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { sendPushoverNotification } from '@/lib/pushover';
 
 function isFreeDrinkName(name: string) {
   const cleanName = name.trim().toUpperCase();
@@ -86,6 +87,7 @@ export async function POST(request: Request) {
     );
   }
 
+  const customerName = paidOrders[0]?.customer_name || '';
   const orderIds = paidOrders.map((order) => order.id);
 
   const { data: movements, error: movementsError } = await supabaseAdmin
@@ -156,6 +158,20 @@ export async function POST(request: Request) {
   if (insertError) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
+
+  await sendPushoverNotification({
+    title: isFreeDrink
+      ? 'FESTA AUDACE - Drink FREE scalato'
+      : 'FESTA AUDACE - Drink scalato',
+    message:
+      `Movimento bar\n` +
+      `Nome: ${customerName || '-'}\n` +
+      `Codice: ${pickupCode}\n` +
+      `Drink: ${drinkName}\n` +
+      `Crediti scalati: ${drinkPriceCredits}\n` +
+      `Tipo crediti: ${isFreeDrink ? 'FREE' : 'ricaricati'}`,
+    priority: 0,
+  });
 
   return NextResponse.json({ ok: true });
 }
