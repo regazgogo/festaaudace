@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 
 type Drink = {
@@ -37,6 +37,8 @@ function buildAudaceCode(name: string, walletNumber: string) {
 }
 
 export default function HomePage() {
+  const qrCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
   const [drinks, setDrinks] = useState<Drink[]>([]);
 
   const [existingName, setExistingName] = useState('');
@@ -139,14 +141,59 @@ export default function HomePage() {
     const walletUrl = `${siteUrl}/wallet/${order.pickup_code}`;
     const barQrUrl = `${siteUrl}/bar?code=${order.pickup_code}`;
 
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(
+      barQrUrl
+    )}`;
+
     const whatsappText = encodeURIComponent(
-      `🍸 Festa Audace\n` +
+      `🍸 FESTA AUDACE\n` +
         `Il mio codice wallet è ${order.pickup_code}\n` +
-        `Numero wallet: ${walletNumber}\n` +
-        `Link saldo: ${walletUrl}`
+        `Numero wallet: ${walletNumber}\n\n` +
+        `Link saldo:\n${walletUrl}\n\n` +
+        `QR code da mostrare al bar:\n${qrImageUrl}`
     );
 
     const whatsappUrl = `https://wa.me/?text=${whatsappText}`;
+
+    async function shareQrPng() {
+      const canvas = qrCanvasRef.current;
+
+      if (!canvas) {
+        alert('QR non ancora pronto');
+        return;
+      }
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          alert('Impossibile creare il PNG del QR');
+          return;
+        }
+
+        const file = new File([blob], `festa-audace-${order.pickup_code}.png`, {
+          type: 'image/png',
+        });
+
+        const shareData = {
+          title: 'FESTA AUDACE - QR Wallet',
+          text: `QR wallet ${order.pickup_code}`,
+          files: [file],
+        };
+
+        if (navigator.canShare && navigator.canShare(shareData)) {
+          await navigator.share(shareData);
+          return;
+        }
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+
+        link.href = url;
+        link.download = `festa-audace-${order.pickup_code}.png`;
+        link.click();
+
+        URL.revokeObjectURL(url);
+      }, 'image/png');
+    }
 
     return (
       <main className="container">
@@ -168,6 +215,7 @@ export default function HomePage() {
 
           <div className="qrBox">
             <QRCodeCanvas
+              ref={qrCanvasRef}
               value={barQrUrl}
               size={220}
               bgColor="#ffffff"
@@ -175,7 +223,12 @@ export default function HomePage() {
               level="H"
               includeMargin
             />
+
             <p>Mostra questo QR al bar</p>
+
+            <button type="button" onClick={shareQrPng}>
+              Condividi QR PNG
+            </button>
           </div>
 
           <p>
