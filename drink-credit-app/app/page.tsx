@@ -131,15 +131,16 @@ export default function HomePage() {
   }
 
   if (order) {
-    const walletNumber = order.pickup_code.split('-')[1];
+    const pickupCode = order.pickup_code;
+    const walletNumber = pickupCode.split('-')[1];
 
     const siteUrl =
       typeof window !== 'undefined'
         ? window.location.origin
         : process.env.NEXT_PUBLIC_SITE_URL || '';
 
-    const walletUrl = `${siteUrl}/wallet/${order.pickup_code}`;
-    const barQrUrl = `${siteUrl}/bar?code=${order.pickup_code}`;
+    const walletUrl = `${siteUrl}/wallet/${pickupCode}`;
+    const barQrUrl = `${siteUrl}/bar?code=${pickupCode}`;
 
     const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(
       barQrUrl
@@ -147,7 +148,7 @@ export default function HomePage() {
 
     const whatsappText = encodeURIComponent(
       `🍸 FESTA AUDACE\n` +
-        `Il mio codice wallet è ${order.pickup_code}\n` +
+        `Il mio codice wallet è ${pickupCode}\n` +
         `Numero wallet: ${walletNumber}\n\n` +
         `Link saldo:\n${walletUrl}\n\n` +
         `QR code da mostrare al bar:\n${qrImageUrl}`
@@ -169,13 +170,13 @@ export default function HomePage() {
           return;
         }
 
-        const file = new File([blob], `festa-audace-${order.pickup_code}.png`, {
+        const file = new File([blob], `festa-audace-${pickupCode}.png`, {
           type: 'image/png',
         });
 
         const shareData = {
           title: 'FESTA AUDACE - QR Wallet',
-          text: `QR wallet ${order.pickup_code}`,
+          text: `QR wallet ${pickupCode}`,
           files: [file],
         };
 
@@ -188,7 +189,7 @@ export default function HomePage() {
         const link = document.createElement('a');
 
         link.href = url;
-        link.download = `festa-audace-${order.pickup_code}.png`;
+        link.download = `festa-audace-${pickupCode}.png`;
         link.click();
 
         URL.revokeObjectURL(url);
@@ -211,7 +212,7 @@ export default function HomePage() {
 
           <p>Il tuo codice Audace è:</p>
 
-          <div className="codeBox">{order.pickup_code}</div>
+          <div className="codeBox">{pickupCode}</div>
 
           <div className="qrBox">
             <QRCodeCanvas
@@ -257,7 +258,7 @@ export default function HomePage() {
           </div>
 
           <div className="inlineActions">
-            <a className="actionLink" href={`/wallet/${order.pickup_code}`}>
+            <a className="actionLink" href={`/wallet/${pickupCode}`}>
               Controlla il tuo saldo
             </a>
 
