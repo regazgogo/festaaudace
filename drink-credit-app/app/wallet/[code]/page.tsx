@@ -16,6 +16,8 @@ type WalletResponse = {
     amount_cents: number;
     credits_purchased: number;
     credits_available: number;
+    included_credits_available?: number;
+    paid_credits_available?: number;
     pending_amount_cents?: number;
     pending_credits?: number;
     created_at: string;
@@ -24,6 +26,11 @@ type WalletResponse = {
   movements?: Movement[];
   error?: string;
 };
+
+function safeNumber(value: unknown) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
 
 async function getWallet(code: string): Promise<WalletResponse> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
@@ -63,6 +70,11 @@ export default async function WalletPage({
 
   const wallet = data.wallet;
   const movements = data.movements || [];
+
+  const includedCredits = safeNumber(wallet.included_credits_available);
+  const paidCredits = safeNumber(wallet.paid_credits_available);
+  const totalCredits = safeNumber(wallet.credits_available);
+
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || '';
   const barQrUrl = `${siteUrl}/bar?code=${wallet.pickup_code}`;
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
@@ -89,9 +101,21 @@ export default async function WalletPage({
             : 'In attesa di approvazione'}
         </p>
 
-        <div className="balanceBox">
-          <span>Crediti disponibili</span>
-          <strong>{wallet.credits_available}</strong>
+        <div className="statsGrid">
+          <div className="statBox">
+            <span>Crediti FREE</span>
+            <strong>{includedCredits}</strong>
+          </div>
+
+          <div className="statBox">
+            <span>Crediti ricaricati</span>
+            <strong>{paidCredits}</strong>
+          </div>
+
+          <div className="statBox">
+            <span>Totale wallet</span>
+            <strong>{totalCredits}</strong>
+          </div>
         </div>
 
         {!!wallet.pending_credits && wallet.pending_credits > 0 && (

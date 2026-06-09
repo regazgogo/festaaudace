@@ -54,9 +54,35 @@ export async function GET(
     );
   }
 
-  const creditsAvailable = (movements || []).reduce((total, movement) => {
-    return total + Number(movement.amount || 0);
+  const allMovements = movements || [];
+
+  const includedCreditsAvailable = allMovements.reduce((total, movement) => {
+    const type = String(movement.type || '');
+    const amount = Number(movement.amount || 0);
+
+    if (
+      type === 'included' ||
+      type === 'redeem_free' ||
+      type === 'undo_free'
+    ) {
+      return total + amount;
+    }
+
+    return total;
   }, 0);
+
+  const paidCreditsAvailable = allMovements.reduce((total, movement) => {
+    const type = String(movement.type || '');
+    const amount = Number(movement.amount || 0);
+
+    if (type === 'purchase' || type === 'redeem' || type === 'undo') {
+      return total + amount;
+    }
+
+    return total;
+  }, 0);
+
+  const creditsAvailable = includedCreditsAvailable + paidCreditsAvailable;
 
   const paidOrders = orders.filter((order) => order.payment_status === 'paid');
   const pendingOrders = orders.filter(
@@ -91,15 +117,21 @@ export async function GET(
       customer_name: mainOrder.customer_name,
       pickup_code: mainOrder.pickup_code,
       payment_status: paidOrders.length > 0 ? 'paid' : mainOrder.payment_status,
+
       amount_cents: totalPaidCents,
       credits_purchased: totalPurchasedCredits,
+
       credits_available: creditsAvailable,
+      included_credits_available: includedCreditsAvailable,
+      paid_credits_available: paidCreditsAvailable,
+
       pending_amount_cents: pendingTopUpCents,
       pending_credits: pendingTopUpCredits,
+
       created_at: mainOrder.created_at,
       paid_at: mainOrder.paid_at,
     },
     orders,
-    movements: movements || [],
+    movements: allMovements,
   });
 }
