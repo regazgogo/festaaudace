@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
+function isFreeDrinkName(name: string) {
+  const cleanName = name.trim().toUpperCase();
+
+  return cleanName === 'BIRRA FREE' || cleanName === 'SPRITZ FREE';
+}
+
 export async function POST(request: Request) {
   const body = await request.json();
 
@@ -53,6 +59,15 @@ export async function POST(request: Request) {
     finalDrinkId = null;
   }
 
+  if (!Number.isFinite(drinkPriceCredits) || drinkPriceCredits <= 0) {
+    return NextResponse.json(
+      { error: 'Prezzo drink non valido' },
+      { status: 400 }
+    );
+  }
+
+  const isFreeDrink = isFreeDrinkName(drinkName);
+
   const { data: paidOrders, error: ordersError } = await supabaseAdmin
     .from('orders')
     .select('id,customer_name,pickup_code,payment_status,created_at')
@@ -75,7 +90,7 @@ export async function POST(request: Request) {
 
   const { data: movements, error: movementsError } = await supabaseAdmin
     .from('credit_movements')
-    .select('amount')
+    .select('type,amount')
     .in('order_id', orderIds);
 
   if (movementsError) {
@@ -85,13 +100,42 @@ export async function POST(request: Request) {
     );
   }
 
-  const creditsAvailable = (movements || []).reduce((total, movement) => {
-    return total + Number(movement.amount || 0);
+  const includedBalance = (movements || []).reduce((total, movement) => {
+    const type = String(movement.type || '');
+    const amount = Number(movement.amount || 0);
+
+    if (
+      type === 'included' ||
+      type === 'redeem_free' ||
+      type === 'undo_free'
+    ) {
+      return total + amount;
+    }
+
+    return total;
   }, 0);
 
-  if (creditsAvailable < drinkPriceCredits) {
+  const paidBalance = (movements || []).reduce((total, movement) => {
+    const type = String(movement.type || '');
+    const amount = Number(movement.amount || 0);
+
+    if (type === 'purchase' || type === 'redeem' || type === 'undo') {
+      return total + amount;
+    }
+
+    return total;
+  }, 0);
+
+  if (isFreeDrink && includedBalance < drinkPriceCredits) {
     return NextResponse.json(
-      { error: 'Crediti insufficienti' },
+      { error: 'Crediti FREE insufficienti' },
+      { status: 400 }
+    );
+  }
+
+  if (!isFreeDrink && paidBalance < drinkPriceCredits) {
+    return NextResponse.json(
+      { error: 'Crediti ricaricati insufficienti' },
       { status: 400 }
     );
   }
@@ -102,7 +146,7 @@ export async function POST(request: Request) {
     .from('credit_movements')
     .insert({
       order_id: mainOrder.id,
-      type: 'redeem',
+      type: isFreeDrink ? 'redeem_free' : 'redeem',
       amount: -drinkPriceCredits,
       drink_id: finalDrinkId,
       note: drinkName,

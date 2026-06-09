@@ -39,9 +39,9 @@ export async function POST(request: Request) {
 
   const { data: lastRedeem, error: lastRedeemError } = await supabaseAdmin
     .from('credit_movements')
-    .select('id,order_id,amount,drink_id,note')
+    .select('id,order_id,type,amount,drink_id,note')
     .in('order_id', orderIds)
-    .eq('type', 'redeem')
+    .in('type', ['redeem', 'redeem_free'])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -60,11 +60,13 @@ export async function POST(request: Request) {
     );
   }
 
+  const undoType = lastRedeem.type === 'redeem_free' ? 'undo_free' : 'undo';
+
   const { error: insertError } = await supabaseAdmin
     .from('credit_movements')
     .insert({
       order_id: lastRedeem.order_id,
-      type: 'undo',
+      type: undoType,
       amount: Math.abs(Number(lastRedeem.amount || 0)),
       drink_id: lastRedeem.drink_id,
       note: `Annullamento: ${lastRedeem.note || 'scarico drink'}`,

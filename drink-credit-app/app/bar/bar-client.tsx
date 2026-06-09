@@ -9,6 +9,8 @@ type Wallet = {
   pickup_code: string;
   payment_status: string;
   credits_available: number;
+  included_credits_available?: number;
+  paid_credits_available?: number;
 };
 
 type Drink = {
@@ -17,6 +19,11 @@ type Drink = {
   price_credits: number;
   category: string | null;
 };
+
+function safeNumber(value: unknown) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
 
 export default function BarClient() {
   const searchParams = useSearchParams();
@@ -170,18 +177,20 @@ export default function BarClient() {
       return;
     }
 
+    const paidBalance = safeNumber(wallet.paid_credits_available);
+
     if (wallet.payment_status !== 'paid') {
       setError('Pagamento non ancora approvato');
       return;
     }
 
-    if (wallet.credits_available < drink.price_credits) {
-      setError('Crediti insufficienti');
+    if (paidBalance < drink.price_credits) {
+      setError('Crediti ricaricati insufficienti per questo drink');
       return;
     }
 
     const confirmed = window.confirm(
-      `Confermi di scalare ${drink.price_credits} crediti per ${drink.name}?`
+      `Confermi di scalare ${drink.price_credits} crediti ricaricati per ${drink.name}?`
     );
 
     if (!confirmed) {
@@ -210,7 +219,9 @@ export default function BarClient() {
       return;
     }
 
-    setMessage(`Scaricato: ${drink.name} (-${drink.price_credits} crediti)`);
+    setMessage(
+      `Scaricato: ${drink.name} (-${drink.price_credits} crediti ricaricati)`
+    );
     await searchWallet();
   }
 
@@ -219,18 +230,20 @@ export default function BarClient() {
       return;
     }
 
+    const includedBalance = safeNumber(wallet.included_credits_available);
+
     if (wallet.payment_status !== 'paid') {
       setError('Pagamento non ancora approvato');
       return;
     }
 
-    if (wallet.credits_available < credits) {
-      setError('Crediti insufficienti');
+    if (includedBalance < credits) {
+      setError('Crediti FREE insufficienti per questo drink');
       return;
     }
 
     const confirmed = window.confirm(
-      `Confermi di scalare ${credits} crediti per ${name}?`
+      `Confermi di scalare ${credits} crediti FREE per ${name}?`
     );
 
     if (!confirmed) {
@@ -260,7 +273,7 @@ export default function BarClient() {
       return;
     }
 
-    setMessage(`Scaricato: ${name} (-${credits} crediti)`);
+    setMessage(`Scaricato: ${name} (-${credits} crediti FREE)`);
     await searchWallet();
   }
 
@@ -302,6 +315,14 @@ export default function BarClient() {
     setMessage('Ultimo scarico annullato');
     await searchWallet();
   }
+
+  const includedBalance = wallet
+    ? safeNumber(wallet.included_credits_available)
+    : 0;
+
+  const paidBalance = wallet ? safeNumber(wallet.paid_credits_available) : 0;
+
+  const totalBalance = wallet ? safeNumber(wallet.credits_available) : 0;
 
   return (
     <main className="container">
@@ -370,9 +391,21 @@ export default function BarClient() {
             </strong>
           </p>
 
-          <div className="balanceBox">
-            <span>Crediti disponibili</span>
-            <strong>{wallet.credits_available}</strong>
+          <div className="statsGrid">
+            <div className="statBox">
+              <span>Crediti FREE</span>
+              <strong>{includedBalance}</strong>
+            </div>
+
+            <div className="statBox">
+              <span>Crediti ricaricati</span>
+              <strong>{paidBalance}</strong>
+            </div>
+
+            <div className="statBox">
+              <span>Totale wallet</span>
+              <strong>{totalBalance}</strong>
+            </div>
           </div>
 
           <h3>Free inclusi</h3>
@@ -382,28 +415,24 @@ export default function BarClient() {
               type="button"
               className="drinkButton freeDrinkButton"
               onClick={() => redeemCustomDrink('BIRRA FREE', 3)}
-              disabled={
-                wallet.payment_status !== 'paid' || wallet.credits_available < 3
-              }
+              disabled={wallet.payment_status !== 'paid' || includedBalance < 3}
             >
               <span>BIRRA FREE</span>
-              <strong>-3</strong>
+              <strong>-3 FREE</strong>
             </button>
 
             <button
               type="button"
               className="drinkButton freeDrinkButton"
               onClick={() => redeemCustomDrink('SPRITZ FREE', 5)}
-              disabled={
-                wallet.payment_status !== 'paid' || wallet.credits_available < 5
-              }
+              disabled={wallet.payment_status !== 'paid' || includedBalance < 5}
             >
               <span>SPRITZ FREE</span>
-              <strong>-5</strong>
+              <strong>-5 FREE</strong>
             </button>
           </div>
 
-          <h3>Scala drink</h3>
+          <h3>Drink normali</h3>
 
           <div className="barGrid">
             {drinks.map((drink) => (
@@ -414,7 +443,7 @@ export default function BarClient() {
                 onClick={() => redeemDrink(drink)}
                 disabled={
                   wallet.payment_status !== 'paid' ||
-                  wallet.credits_available < drink.price_credits
+                  paidBalance < drink.price_credits
                 }
               >
                 <span>{drink.name}</span>

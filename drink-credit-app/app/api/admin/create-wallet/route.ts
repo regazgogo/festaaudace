@@ -43,8 +43,8 @@ export async function POST(request: Request) {
 
   const note =
     walletType === 'giornata_intera'
-      ? 'Wallet Giornata Intera - 20 crediti inclusi'
-      : 'Wallet Post Cena - 5 crediti inclusi';
+      ? 'Wallet Giornata Intera - 20 crediti FREE inclusi'
+      : 'Wallet Post Cena - 5 crediti FREE inclusi';
 
   let pickupCode = generatePickupCode(customerName);
 
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
     .from('credit_movements')
     .insert({
       order_id: order.id,
-      type: 'purchase',
+      type: 'included',
       amount: credits,
       note,
       created_by: 'admin',
