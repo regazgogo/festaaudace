@@ -1,6 +1,16 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
+type MovementRow = {
+  id: string;
+  order_id: string;
+  type: string;
+  amount: number;
+  drink_id: string | null;
+  note: string | null;
+  created_at: string;
+};
+
 export async function POST(request: Request) {
   const body = await request.json();
 
@@ -37,39 +47,67 @@ export async function POST(request: Request) {
 
   const orderIds = paidOrders.map((order) => order.id);
 
-  const { data: lastRedeem, error: lastRedeemError } = await supabaseAdmin
+  const { data: movements, error: movementsError } = await supabaseAdmin
     .from('credit_movements')
-    .select('id,order_id,type,amount,drink_id,note')
+    .select('id,order_id,type,amount,drink_id,note,created_at')
     .in('order_id', orderIds)
-    .in('type', ['redeem', 'redeem_free'])
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .in('type', ['redeem', 'redeem_free', 'undo', 'undo_free'])
+    .order('created_at', { ascending: false });
 
-  if (lastRedeemError) {
+  if (movementsError) {
     return NextResponse.json(
-      { error: lastRedeemError.message },
+      { error: movementsError.message },
       { status: 500 }
     );
   }
 
-  if (!lastRedeem) {
+  const allMovements = (movements || []) as MovementRow[];
+
+  const alreadyUndoneMovementIds = new Set<string>();
+
+  for (const movement of allMovements) {
+    if (movement.type !== 'undo' && movement.type !== 'undo_free') {
+      continue;
+    }
+
+    const match = String(movement.note || '').match(/UNDO_OF:([0-9a-f-]+)/i);
+
+    if (match?.[1]) {
+      alreadyUndoneMovementIds.add(match[1]);
+    }
+  }
+
+  const lastRedeemToUndo = allMovements.find((movement) => {
+    const isRedeem =
+      movement.type === 'redeem' || movement.type === 'redeem_free';
+
+    if (!isRedeem) {
+      return false;
+    }
+
+    return !alreadyUndoneMovementIds.has(movement.id);
+  });
+
+  if (!lastRedeemToUndo) {
     return NextResponse.json(
       { error: 'Nessuno scarico da annullare' },
       { status: 404 }
     );
   }
 
-  const undoType = lastRedeem.type === 'redeem_free' ? 'undo_free' : 'undo';
+  const undoType =
+    lastRedeemToUndo.type === 'redeem_free' ? 'undo_free' : 'undo';
 
   const { error: insertError } = await supabaseAdmin
     .from('credit_movements')
     .insert({
-      order_id: lastRedeem.order_id,
+      order_id: lastRedeemToUndo.order_id,
       type: undoType,
-      amount: Math.abs(Number(lastRedeem.amount || 0)),
-      drink_id: lastRedeem.drink_id,
-      note: `Annullamento: ${lastRedeem.note || 'scarico drink'}`,
+      amount: Math.abs(Number(lastRedeemToUndo.amount || 0)),
+      drink_id: lastRedeemToUndo.drink_id,
+      note: `Annullamento: ${
+        lastRedeemToUndo.note || 'scarico drink'
+      } | UNDO_OF:${lastRedeemToUndo.id}`,
       created_by: 'bar',
     });
 
@@ -77,5 +115,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({
+    ok: true,
+    undoneMovementId: lastRedeemToUndo.id,
+  });
 }
