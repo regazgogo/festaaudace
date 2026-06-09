@@ -12,345 +12,479 @@ type PendingOrder = {
   created_at: string;
 };
 
-type WalletSummary = {
-  pickup_code: string;
+type WalletRow = {
   customer_name: string;
-  approved_credits: number;
-  pending_credits: number;
-  used_credits: number;
-  available_credits: number;
-  approved_amount_cents: number;
-  pending_amount_cents: number;
-  created_at: string;
-  last_order_at: string;
+  pickup_code: string;
+  payment_status?: string;
+  amount_cents?: number;
+  credits_purchased?: number;
+  credits_available?: number;
+  pending_credits?: number;
+  pending_amount_cents?: number;
+  created_at?: string;
+  paid_at?: string | null;
 };
 
 type AdminTotals = {
-  wallets_count: number;
-  approved_credits: number;
-  pending_credits: number;
-  used_credits: number;
-  available_credits: number;
-  approved_amount_cents: number;
-  pending_amount_cents: number;
+  ordiniPagati?: number;
+  totaleIncassatoCents?: number;
+  creditiVenduti?: number;
+  creditiUsati?: number;
+  creditiResidui?: number;
+  walletAttivi?: number;
+  ordiniInAttesa?: number;
+};
+
+type AdminData = {
+  totals?: AdminTotals;
+  pendingOrders?: PendingOrder[];
+  orders?: PendingOrder[];
+  wallets?: WalletRow[];
 };
 
 function safeNumber(value: unknown) {
-  const n = Number(value || 0);
-  return Number.isFinite(n) ? n : 0;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
 }
 
-function euro(cents: number) {
+function euro(cents: unknown) {
   return `${(safeNumber(cents) / 100).toFixed(0)} €`;
 }
 
 export default function AdminPage() {
   const [adminPin, setAdminPin] = useState('');
-  const [orders, setOrders] = useState<PendingOrder[]>([]);
-  const [wallets, setWallets] = useState<WalletSummary[]>([]);
-  const [totals, setTotals] = useState<AdminTotals>({
-    wallets_count: 0,
-    approved_credits: 0,
-    pending_credits: 0,
-    used_credits: 0,
-    available_credits: 0,
-    approved_amount_cents: 0,
-    pending_amount_cents: 0,
-  });
-  const [error, setError] = useState('');
+  const [data, setData] = useState<AdminData | null>(null);
   const [loaded, setLoaded] = useState(false);
+
+  const [newWalletName, setNewWalletName] = useState('');
+  const [newWalletType, setNewWalletType] = useState('giornata_intera');
+  const [createdWalletCode, setCreatedWalletCode] = useState('');
+  const [creatingWallet, setCreatingWallet] = useState(false);
+
   const [loading, setLoading] = useState(false);
-
-  async function loadPendingOrders() {
-    const res = await fetch('/api/admin/pending-orders', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ adminPin }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data.error || 'Errore caricamento ordini');
-    }
-
-    setOrders(data.orders || []);
-  }
-
-  async function loadStats() {
-    const res = await fetch('/api/admin/stats', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ adminPin }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data.error || 'Errore caricamento statistiche');
-    }
-
-    setWallets(data.wallets || []);
-    setTotals({
-      wallets_count: safeNumber(data.totals?.wallets_count),
-      approved_credits: safeNumber(data.totals?.approved_credits),
-      pending_credits: safeNumber(data.totals?.pending_credits),
-      used_credits: safeNumber(data.totals?.used_credits),
-      available_credits: safeNumber(data.totals?.available_credits),
-      approved_amount_cents: safeNumber(data.totals?.approved_amount_cents),
-      pending_amount_cents: safeNumber(data.totals?.pending_amount_cents),
-    });
-  }
+  const [actionLoading, setActionLoading] = useState('');
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
 
   async function loadAdminData() {
     setError('');
+    setMessage('');
     setLoading(true);
 
     try {
-      await loadPendingOrders();
-      await loadStats();
+      const res = await fetch('/api/admin/stats', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ adminPin }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        setError(json.error || 'Errore caricamento admin');
+        setLoaded(false);
+        return;
+      }
+
+      setData(json);
       setLoaded(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Errore di connessione');
+    } catch {
+      setError('Errore di connessione');
+      setLoaded(false);
     } finally {
       setLoading(false);
     }
   }
 
+  async function createWallet(event: React.FormEvent) {
+    event.preventDefault();
+
+    setError('');
+    setMessage('');
+    setCreatedWalletCode('');
+    setCreatingWallet(true);
+
+    try {
+      const res = await fetch('/api/admin/create-wallet', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          adminPin,
+          customerName: newWalletName,
+          walletType: newWalletType,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        setError(json.error || 'Errore creazione wallet');
+        return;
+      }
+
+      setCreatedWalletCode(json.order.pickup_code);
+      setMessage(`Wallet creato: ${json.order.pickup_code}`);
+      setNewWalletName('');
+      setNewWalletType('giornata_intera');
+
+      await loadAdminData();
+    } catch {
+      setError('Errore di connessione');
+    } finally {
+      setCreatingWallet(false);
+    }
+  }
+
   async function approveOrder(orderId: string) {
     setError('');
+    setMessage('');
+    setActionLoading(orderId);
 
-    const res = await fetch('/api/admin/approve-order', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ adminPin, orderId }),
-    });
+    try {
+      const res = await fetch('/api/admin/approve-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          adminPin,
+          orderId,
+        }),
+      });
 
-    const data = await res.json();
+      const json = await res.json();
 
-    if (!res.ok) {
-      setError(data.error || 'Errore approvazione ordine');
-      return;
+      if (!res.ok) {
+        setError(json.error || 'Errore approvazione ordine');
+        return;
+      }
+
+      setMessage('Ordine approvato');
+      await loadAdminData();
+    } catch {
+      setError('Errore di connessione');
+    } finally {
+      setActionLoading('');
     }
-
-    await loadAdminData();
   }
 
   async function cancelOrder(orderId: string) {
-    setError('');
-
-    const res = await fetch('/api/admin/cancel-order', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ adminPin, orderId }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      setError(data.error || 'Errore annullamento ordine');
-      return;
-    }
-
-    await loadAdminData();
-  }
-
-  async function deleteWallet(pickupCode: string) {
-    setError('');
-
-    const confirmed = window.confirm(
-      `Confermi di eliminare definitivamente il wallet ${pickupCode}?\n\nQuesta operazione eliminerà ordini, ricariche e movimenti collegati.`
-    );
+    const confirmed = window.confirm('Confermi di annullare questo ordine?');
 
     if (!confirmed) {
       return;
     }
 
+    setError('');
+    setMessage('');
+    setActionLoading(orderId);
+
+    try {
+      const res = await fetch('/api/admin/cancel-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          adminPin,
+          orderId,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        setError(json.error || 'Errore annullamento ordine');
+        return;
+      }
+
+      setMessage('Ordine annullato');
+      await loadAdminData();
+    } catch {
+      setError('Errore di connessione');
+    } finally {
+      setActionLoading('');
+    }
+  }
+
+  async function deleteWallet(pickupCode: string) {
+    const firstConfirm = window.confirm(
+      `Vuoi eliminare il wallet ${pickupCode}?`
+    );
+
+    if (!firstConfirm) {
+      return;
+    }
+
     const secondConfirm = window.confirm(
-      `Ultima conferma: vuoi davvero eliminare ${pickupCode}?`
+      `Conferma definitiva: eliminare ${pickupCode} e tutti i suoi movimenti?`
     );
 
     if (!secondConfirm) {
       return;
     }
 
-    const res = await fetch('/api/admin/delete-wallet', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ adminPin, pickupCode }),
-    });
+    setError('');
+    setMessage('');
+    setActionLoading(pickupCode);
 
-    const data = await res.json();
+    try {
+      const res = await fetch('/api/admin/delete-wallet', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          adminPin,
+          pickupCode,
+        }),
+      });
 
-    if (!res.ok) {
-      setError(data.error || 'Errore eliminazione wallet');
-      return;
+      const json = await res.json();
+
+      if (!res.ok) {
+        setError(json.error || 'Errore eliminazione wallet');
+        return;
+      }
+
+      setMessage(`Wallet eliminato: ${pickupCode}`);
+      await loadAdminData();
+    } catch {
+      setError('Errore di connessione');
+    } finally {
+      setActionLoading('');
     }
-
-    await loadAdminData();
   }
+
+  const totals = data?.totals || {};
+  const pendingOrders = data?.pendingOrders || data?.orders || [];
+  const wallets = data?.wallets || [];
 
   return (
     <main className="container">
-      <section className="card">
-        <h1>Admin</h1>
+      <section className="hero">
+        <h1>Admin FESTA AUDACE</h1>
+        <p>Gestione wallet, ricariche e crediti drink.</p>
+      </section>
 
-        <label>
-          PIN admin
+      <section className="card">
+        <h2>Accesso admin</h2>
+
+        <div className="inlineActions">
           <input
             type="password"
             value={adminPin}
             onChange={(event) => setAdminPin(event.target.value)}
             placeholder="PIN admin"
           />
-        </label>
 
-        <button onClick={loadAdminData} disabled={loading}>
-          {loading ? 'Caricamento...' : 'Carica pannello admin'}
-        </button>
+          <button type="button" onClick={loadAdminData} disabled={loading}>
+            {loading ? 'Caricamento...' : 'Carica pannello'}
+          </button>
+        </div>
 
         {error && <p className="error">{error}</p>}
+        {message && <p className="success">{message}</p>}
       </section>
 
       {loaded && (
-        <section className="card">
-          <h2>Panoramica generale</h2>
+        <>
+          <section className="card">
+            <h2>Crea wallet</h2>
 
-          <div className="statsGrid">
-            <div className="statBox">
-              <span>Wallet creati</span>
-              <strong>{safeNumber(totals.wallets_count)}</strong>
+            <form onSubmit={createWallet}>
+              <label>
+                Nome Audace
+                <input
+                  value={newWalletName}
+                  onChange={(event) => setNewWalletName(event.target.value)}
+                  placeholder="Es. Filippo"
+                  required
+                />
+              </label>
+
+              <label>
+                Tipo wallet
+                <select
+                  value={newWalletType}
+                  onChange={(event) => setNewWalletType(event.target.value)}
+                >
+                  <option value="giornata_intera">
+                    Giornata Intera - 20 crediti
+                  </option>
+                  <option value="post_cena">Post Cena - 5 crediti</option>
+                </select>
+              </label>
+
+              <button type="submit" disabled={creatingWallet}>
+                {creatingWallet ? 'Creazione...' : 'Crea wallet'}
+              </button>
+            </form>
+
+            {createdWalletCode && (
+              <p className="success">
+                Wallet creato: <strong>{createdWalletCode}</strong>
+              </p>
+            )}
+          </section>
+
+          <section className="card">
+            <h2>Panoramica generale</h2>
+
+            <div className="statsGrid">
+              <div className="statBox">
+                <span>Incassato</span>
+                <strong>{euro(totals.totaleIncassatoCents)}</strong>
+              </div>
+
+              <div className="statBox">
+                <span>Ordini pagati</span>
+                <strong>{safeNumber(totals.ordiniPagati)}</strong>
+              </div>
+
+              <div className="statBox">
+                <span>Ordini in attesa</span>
+                <strong>
+                  {safeNumber(totals.ordiniInAttesa || pendingOrders.length)}
+                </strong>
+              </div>
+
+              <div className="statBox">
+                <span>Wallet attivi</span>
+                <strong>
+                  {safeNumber(totals.walletAttivi || wallets.length)}
+                </strong>
+              </div>
+
+              <div className="statBox">
+                <span>Crediti caricati</span>
+                <strong>{safeNumber(totals.creditiVenduti)}</strong>
+              </div>
+
+              <div className="statBox">
+                <span>Crediti usati</span>
+                <strong>{safeNumber(totals.creditiUsati)}</strong>
+              </div>
+
+              <div className="statBox">
+                <span>Crediti residui</span>
+                <strong>{safeNumber(totals.creditiResidui)}</strong>
+              </div>
             </div>
+          </section>
 
-            <div className="statBox">
-              <span>Incassato approvato</span>
-              <strong>{euro(totals.approved_amount_cents)}</strong>
-            </div>
+          <section className="card">
+            <h2>Ordini in attesa</h2>
 
-            <div className="statBox">
-              <span>Da approvare</span>
-              <strong>{euro(totals.pending_amount_cents)}</strong>
-            </div>
-
-            <div className="statBox">
-              <span>Crediti disponibili</span>
-              <strong>{safeNumber(totals.available_credits)}</strong>
-            </div>
-
-            <div className="statBox">
-              <span>Crediti usati</span>
-              <strong>{safeNumber(totals.used_credits)}</strong>
-            </div>
-
-            <div className="statBox">
-              <span>Crediti in attesa</span>
-              <strong>{safeNumber(totals.pending_credits)}</strong>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {loaded && (
-        <section className="card">
-          <h2>Ordini in attesa</h2>
-
-          {orders.length === 0 ? (
-            <p>Nessun ordine in attesa.</p>
-          ) : (
-            <div className="adminOrders">
-              {orders.map((order) => (
-                <div key={order.id} className="adminOrder">
-                  <div>
-                    <strong>{order.customer_name}</strong>
-                    <p>Codice: {order.pickup_code}</p>
-                    <p>
-                      Importo: {euro(order.amount_cents)} - Crediti:{' '}
-                      {safeNumber(order.credits_purchased)}
-                    </p>
-                  </div>
-
-                  <div className="adminActions">
-                    <button onClick={() => approveOrder(order.id)}>
-                      Approva
-                    </button>
-
-                    <button
-                      className="dangerButton"
-                      onClick={() => cancelOrder(order.id)}
-                    >
-                      Annulla
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-
-      {loaded && (
-        <section className="card">
-          <h2>Panoramica wallet</h2>
-
-          {wallets.length === 0 ? (
-            <p>Nessun wallet creato.</p>
-          ) : (
-            <div className="walletTableWrapper">
-              <table className="walletTable">
-                <thead>
-                  <tr>
-                    <th>Wallet</th>
-                    <th>Nome</th>
-                    <th>Saldo</th>
-                    <th>Usati</th>
-                    <th>Caricati</th>
-                    <th>In attesa</th>
-                    <th>Incassato</th>
-                    <th>Azioni</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {wallets.map((wallet) => (
-                    <tr key={wallet.pickup_code}>
-                      <td>
-                        <a href={`/wallet/${wallet.pickup_code}`}>
-                          {wallet.pickup_code}
-                        </a>
-                      </td>
-                      <td>{wallet.customer_name}</td>
-                      <td>
-                        <strong>{safeNumber(wallet.available_credits)}</strong>
-                      </td>
-                      <td>{safeNumber(wallet.used_credits)}</td>
-                      <td>{safeNumber(wallet.approved_credits)}</td>
-                      <td>{safeNumber(wallet.pending_credits)}</td>
-                      <td>{euro(wallet.approved_amount_cents)}</td>
-                      <td>
-                        <button
-                          className="dangerSmallButton"
-                          onClick={() => deleteWallet(wallet.pickup_code)}
-                        >
-                          Elimina
-                        </button>
-                      </td>
+            {pendingOrders.length === 0 ? (
+              <p className="muted">Nessun ordine in attesa.</p>
+            ) : (
+              <div className="tableWrap">
+                <table className="walletTable">
+                  <thead>
+                    <tr>
+                      <th>Nome</th>
+                      <th>Codice</th>
+                      <th>Crediti</th>
+                      <th>Importo</th>
+                      <th>Azioni</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+                  </thead>
+
+                  <tbody>
+                    {pendingOrders.map((order) => (
+                      <tr key={order.id}>
+                        <td>{order.customer_name}</td>
+                        <td>
+                          <strong>{order.pickup_code}</strong>
+                        </td>
+                        <td>{safeNumber(order.credits_purchased)}</td>
+                        <td>{euro(order.amount_cents)}</td>
+                        <td>
+                          <div className="inlineActions">
+                            <button
+                              type="button"
+                              onClick={() => approveOrder(order.id)}
+                              disabled={actionLoading === order.id}
+                            >
+                              Approva
+                            </button>
+
+                            <button
+                              type="button"
+                              className="dangerSmallButton"
+                              onClick={() => cancelOrder(order.id)}
+                              disabled={actionLoading === order.id}
+                            >
+                              Annulla
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section className="card">
+            <h2>Panoramica wallet</h2>
+
+            {wallets.length === 0 ? (
+              <p className="muted">Nessun wallet disponibile.</p>
+            ) : (
+              <div className="tableWrap">
+                <table className="walletTable">
+                  <thead>
+                    <tr>
+                      <th>Nome</th>
+                      <th>Codice</th>
+                      <th>Crediti caricati</th>
+                      <th>Saldo</th>
+                      <th>Ricariche in attesa</th>
+                      <th>Azioni</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {wallets.map((wallet) => (
+                      <tr key={wallet.pickup_code}>
+                        <td>{wallet.customer_name}</td>
+                        <td>
+                          <strong>{wallet.pickup_code}</strong>
+                        </td>
+                        <td>{safeNumber(wallet.credits_purchased)}</td>
+                        <td>
+                          <strong>{safeNumber(wallet.credits_available)}</strong>
+                        </td>
+                        <td>
+                          {safeNumber(wallet.pending_credits) > 0
+                            ? `${safeNumber(wallet.pending_credits)} crediti`
+                            : '-'}
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="dangerSmallButton"
+                            onClick={() => deleteWallet(wallet.pickup_code)}
+                            disabled={actionLoading === wallet.pickup_code}
+                          >
+                            Elimina
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </>
       )}
     </main>
   );
