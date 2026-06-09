@@ -24,6 +24,8 @@ type WalletRow = {
   paid_credits_available?: number;
   pending_credits?: number;
   pending_amount_cents?: number;
+  pending_order_id?: string | null;
+  pending_order_ids?: string[];
   created_at?: string;
   paid_at?: string | null;
 };
@@ -36,6 +38,14 @@ type AdminTotals = {
   creditiResidui?: number;
   walletAttivi?: number;
   ordiniInAttesa?: number;
+
+  wallets_count?: number;
+  approved_credits?: number;
+  pending_credits?: number;
+  used_credits?: number;
+  available_credits?: number;
+  approved_amount_cents?: number;
+  pending_amount_cents?: number;
 };
 
 type AdminData = {
@@ -639,7 +649,8 @@ export default function AdminPage() {
                     <tr>
                       <th>Nome</th>
                       <th>Codice</th>
-                      <th>Crediti caricati</th>
+                      <th>Crediti FREE</th>
+                      <th>Crediti ricaricati</th>
                       <th>Saldo</th>
                       <th>Ricariche in attesa</th>
                       <th>Azioni</th>
@@ -650,20 +661,49 @@ export default function AdminPage() {
                     {wallets.map((wallet) => (
                       <tr key={wallet.pickup_code}>
                         <td>{wallet.customer_name}</td>
+
                         <td>
                           <strong>{wallet.pickup_code}</strong>
                         </td>
-                        <td>{safeNumber(wallet.credits_purchased)}</td>
+
+                        <td>{safeNumber(wallet.included_credits_available)}</td>
+
+                        <td>{safeNumber(wallet.paid_credits_available)}</td>
+
                         <td>
                           <strong>
                             {safeNumber(wallet.credits_available)}
                           </strong>
                         </td>
+
                         <td>
-                          {safeNumber(wallet.pending_credits) > 0
-                            ? `${safeNumber(wallet.pending_credits)} crediti`
-                            : '-'}
+                          {safeNumber(wallet.pending_credits) > 0 ? (
+                            <div className="inlineActions">
+                              <span>
+                                {safeNumber(wallet.pending_credits)} crediti
+                              </span>
+
+                              {wallet.pending_order_id && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    approveOrder(
+                                      wallet.pending_order_id as string
+                                    )
+                                  }
+                                  disabled={
+                                    actionLoading === wallet.pending_order_id
+                                  }
+                                >
+                                  Approva ricarica
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            '-'
+                          )}
                         </td>
+
                         <td>
                           <button
                             type="button"
