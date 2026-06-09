@@ -19,8 +19,6 @@ type CreatedOrder = {
   payment_status: string;
 };
 
-type Mode = 'choice' | 'new' | 'existing';
-
 function euro(cents: number) {
   return `${(cents / 100).toFixed(0)} €`;
 }
@@ -39,20 +37,13 @@ function buildAudaceCode(name: string, walletNumber: string) {
 }
 
 export default function HomePage() {
-  const [mode, setMode] = useState<Mode>('choice');
   const [drinks, setDrinks] = useState<Drink[]>([]);
-
-  const [customerName, setCustomerName] = useState('');
-  const [credits, setCredits] = useState(20);
 
   const [existingName, setExistingName] = useState('');
   const [existingWalletNumber, setExistingWalletNumber] = useState('');
   const [topUpCredits, setTopUpCredits] = useState(20);
 
   const [order, setOrder] = useState<CreatedOrder | null>(null);
-  const [orderType, setOrderType] = useState<'new' | 'topup'>('new');
-
-  const [loading, setLoading] = useState(false);
   const [topUpLoading, setTopUpLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -68,39 +59,6 @@ export default function HomePage() {
 
     loadData();
   }, []);
-
-  async function createOrder(event: React.FormEvent) {
-    event.preventDefault();
-    setError('');
-    setLoading(true);
-
-    try {
-      const res = await fetch('/api/manual-order', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          customerName,
-          credits,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || 'Errore durante la creazione ordine');
-        return;
-      }
-
-      setOrderType('new');
-      setOrder(data.order);
-    } catch {
-      setError('Errore di connessione');
-    } finally {
-      setLoading(false);
-    }
-  }
 
   function openExistingWallet(event: React.FormEvent) {
     event.preventDefault();
@@ -162,7 +120,6 @@ export default function HomePage() {
         return;
       }
 
-      setOrderType('topup');
       setOrder(data.order);
     } catch {
       setError('Errore di connessione');
@@ -194,11 +151,7 @@ export default function HomePage() {
     return (
       <main className="container">
         <section className="card">
-          <h1>
-            {orderType === 'topup'
-              ? 'Ricarica in attesa'
-              : 'Pagamento in attesa'}
-          </h1>
+          <h1>Ricarica in attesa</h1>
 
           <p>
             Invia <strong>{euro(order.amount_cents)}</strong> tramite Revolut o
@@ -250,10 +203,6 @@ export default function HomePage() {
             </a>
           </div>
 
-          <p>
-            Quando il pagamento viene approvato, potrai usare i crediti al bar.
-          </p>
-
           <div className="inlineActions">
             <a className="actionLink" href={`/wallet/${order.pickup_code}`}>
               Controlla il tuo saldo
@@ -273,9 +222,6 @@ export default function HomePage() {
             type="button"
             onClick={() => {
               setOrder(null);
-              setMode('choice');
-              setCustomerName('');
-              setCredits(20);
               setExistingName('');
               setExistingWalletNumber('');
               setTopUpCredits(20);
@@ -292,178 +238,79 @@ export default function HomePage() {
   return (
     <main className="container">
       <section className="hero">
-        <h1>Drink Credits</h1>
+        <h1>FESTA AUDACE</h1>
         <p>
-          Carica crediti, paga con Revolut o PayPal e mostra il codice Audace al
-          bar.
+          Apri il tuo wallet, controlla il saldo o ricarica i crediti drink.
         </p>
       </section>
 
-      {mode === 'choice' && (
-        <section className="card">
-          <h2>Che Audace sei?</h2>
+      <section className="card">
+        <h2>Audace già bevuto</h2>
 
-          <div className="choiceGrid">
-            <button
-              type="button"
-              className="choiceButton"
-              onClick={() => {
-                setError('');
-                setMode('new');
-              }}
-            >
-              <strong>Nuovo Audace</strong>
-              <span>Creo un nuovo wallet e carico crediti</span>
-            </button>
+        <form onSubmit={openExistingWallet}>
+          <label>
+            Nome usato per creare il wallet
+            <input
+              value={existingName}
+              onChange={(event) => setExistingName(event.target.value)}
+              placeholder="Es. Alberto"
+              required
+            />
+          </label>
 
-            <button
-              type="button"
-              className="choiceButton"
-              onClick={() => {
-                setError('');
-                setMode('existing');
-              }}
-            >
-              <strong>Audace già bevuto</strong>
-              <span>Ho già un wallet e voglio vedere o ricaricare il saldo</span>
-            </button>
+          <label>
+            Numero wallet
+            <input
+              value={existingWalletNumber}
+              onChange={(event) => setExistingWalletNumber(event.target.value)}
+              placeholder="Es. 4821"
+              inputMode="numeric"
+              maxLength={4}
+              required
+            />
+          </label>
+
+          <p className="muted">
+            Esempio: Alberto + 4821 apre il wallet ALB-4821.
+          </p>
+
+          {error && <p className="error">{error}</p>}
+
+          <div className="inlineActions">
+            <button type="submit">Apri saldo</button>
           </div>
-        </section>
-      )}
+        </form>
 
-      {mode === 'new' && (
-        <section className="card">
-          <h2>Nuovo Audace</h2>
+        <hr className="sectionDivider" />
 
-          <form onSubmit={createOrder}>
-            <label>
-              Nome
-              <input
-                value={customerName}
-                onChange={(event) => setCustomerName(event.target.value)}
-                placeholder="Es. Alberto"
-                required
-              />
-            </label>
+        <h3>Ricarica questo wallet</h3>
 
-            <label>
-              Crediti da caricare
-              <input
-                type="number"
-                min="1"
-                max="200"
-                step="1"
-                value={credits}
-                onChange={(event) => setCredits(Number(event.target.value))}
-                required
-              />
-            </label>
+        <form onSubmit={topUpExistingWallet}>
+          <label>
+            Crediti da aggiungere
+            <input
+              type="number"
+              min="1"
+              max="200"
+              step="1"
+              value={topUpCredits}
+              onChange={(event) => setTopUpCredits(Number(event.target.value))}
+              required
+            />
+          </label>
 
-            <p>
-              Totale da pagare:{' '}
-              <strong>{Number.isFinite(credits) ? credits : 0} €</strong>
-            </p>
+          <p>
+            Totale ricarica:{' '}
+            <strong>
+              {Number.isFinite(topUpCredits) ? topUpCredits : 0} €
+            </strong>
+          </p>
 
-            {error && <p className="error">{error}</p>}
-
-            <div className="inlineActions">
-              <button type="submit" disabled={loading}>
-                {loading ? 'Creazione...' : 'Crea wallet'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setError('');
-                  setMode('choice');
-                }}
-              >
-                Indietro
-              </button>
-            </div>
-          </form>
-        </section>
-      )}
-
-      {mode === 'existing' && (
-        <section className="card">
-          <h2>Audace già bevuto</h2>
-
-          <form onSubmit={openExistingWallet}>
-            <label>
-              Nome usato per creare il wallet
-              <input
-                value={existingName}
-                onChange={(event) => setExistingName(event.target.value)}
-                placeholder="Es. Alberto"
-                required
-              />
-            </label>
-
-            <label>
-              Numero wallet
-              <input
-                value={existingWalletNumber}
-                onChange={(event) => setExistingWalletNumber(event.target.value)}
-                placeholder="Es. 4821"
-                inputMode="numeric"
-                maxLength={4}
-                required
-              />
-            </label>
-
-            <p className="muted">
-              Esempio: Alberto + 4821 apre il wallet ALB-4821.
-            </p>
-
-            {error && <p className="error">{error}</p>}
-
-            <div className="inlineActions">
-              <button type="submit">Apri saldo</button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setError('');
-                  setMode('choice');
-                }}
-              >
-                Indietro
-              </button>
-            </div>
-          </form>
-
-          <hr className="sectionDivider" />
-
-          <h3>Ricarica questo wallet</h3>
-
-          <form onSubmit={topUpExistingWallet}>
-            <label>
-              Crediti da aggiungere
-              <input
-                type="number"
-                min="1"
-                max="200"
-                step="1"
-                value={topUpCredits}
-                onChange={(event) => setTopUpCredits(Number(event.target.value))}
-                required
-              />
-            </label>
-
-            <p>
-              Totale ricarica:{' '}
-              <strong>
-                {Number.isFinite(topUpCredits) ? topUpCredits : 0} €
-              </strong>
-            </p>
-
-            <button type="submit" disabled={topUpLoading}>
-              {topUpLoading ? 'Creazione ricarica...' : 'Ricarica wallet'}
-            </button>
-          </form>
-        </section>
-      )}
+          <button type="submit" disabled={topUpLoading}>
+            {topUpLoading ? 'Creazione ricarica...' : 'Ricarica wallet'}
+          </button>
+        </form>
+      </section>
 
       <section className="card">
         <h2>Menu drink</h2>
