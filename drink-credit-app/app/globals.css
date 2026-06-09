@@ -518,3 +518,14 @@ button:disabled {
   font-weight: 900;
   margin: 0;
 }
+
+.freeDrinkButton {
+  background: #facc15;
+  color: #111827;
+  border-color: #fde68a;
+}
+
+.freeDrinkButton span,
+.freeDrinkButton strong {
+  color: #111827;
+}

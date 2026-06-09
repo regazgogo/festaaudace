@@ -6,28 +6,51 @@ export async function POST(request: Request) {
 
   const pickupCode = String(body.pickupCode || '').trim().toUpperCase();
   const drinkId = String(body.drinkId || '').trim();
+  const customDrinkName = String(body.customDrinkName || '').trim();
+  const customPriceCredits = Number(body.customPriceCredits || 0);
   const barPin = String(body.barPin || '');
 
   if (barPin !== process.env.BAR_PIN) {
     return NextResponse.json({ error: 'PIN bar non valido' }, { status: 401 });
   }
 
-  if (!pickupCode || !drinkId) {
+  if (!pickupCode) {
     return NextResponse.json(
-      { error: 'Codice cliente e drink obbligatori' },
+      { error: 'Codice cliente obbligatorio' },
       { status: 400 }
     );
   }
 
-  const { data: drink, error: drinkError } = await supabaseAdmin
-    .from('drinks')
-    .select('id,name,price_credits,active')
-    .eq('id', drinkId)
-    .eq('active', true)
-    .maybeSingle();
+  let drinkName = '';
+  let drinkPriceCredits = 0;
+  let finalDrinkId: string | null = null;
 
-  if (drinkError || !drink) {
-    return NextResponse.json({ error: 'Drink non trovato' }, { status: 404 });
+  if (drinkId) {
+    const { data: drink, error: drinkError } = await supabaseAdmin
+      .from('drinks')
+      .select('id,name,price_credits,active')
+      .eq('id', drinkId)
+      .eq('active', true)
+      .maybeSingle();
+
+    if (drinkError || !drink) {
+      return NextResponse.json({ error: 'Drink non trovato' }, { status: 404 });
+    }
+
+    drinkName = drink.name;
+    drinkPriceCredits = Number(drink.price_credits || 0);
+    finalDrinkId = drink.id;
+  } else {
+    if (!customDrinkName || !customPriceCredits) {
+      return NextResponse.json(
+        { error: 'Drink personalizzato non valido' },
+        { status: 400 }
+      );
+    }
+
+    drinkName = customDrinkName;
+    drinkPriceCredits = customPriceCredits;
+    finalDrinkId = null;
   }
 
   const { data: paidOrders, error: ordersError } = await supabaseAdmin
@@ -66,7 +89,7 @@ export async function POST(request: Request) {
     return total + Number(movement.amount || 0);
   }, 0);
 
-  if (creditsAvailable < drink.price_credits) {
+  if (creditsAvailable < drinkPriceCredits) {
     return NextResponse.json(
       { error: 'Crediti insufficienti' },
       { status: 400 }
@@ -80,9 +103,9 @@ export async function POST(request: Request) {
     .insert({
       order_id: mainOrder.id,
       type: 'redeem',
-      amount: -drink.price_credits,
-      drink_id: drink.id,
-      note: drink.name,
+      amount: -drinkPriceCredits,
+      drink_id: finalDrinkId,
+      note: drinkName,
       created_by: 'bar',
     });
 
