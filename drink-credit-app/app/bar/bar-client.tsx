@@ -65,19 +65,48 @@ export default function BarClient() {
   }, []);
 
   function extractCodeFromQr(decodedText: string) {
-    try {
-      const url = new URL(decodedText);
-      const code = url.searchParams.get('code');
+  const text = decodedText.trim();
 
-      if (code) {
-        return code.trim().toUpperCase();
-      }
-    } catch {
-      // Se non è un URL, uso direttamente il testo letto dal QR.
+  // Caso 1: QR con URL completo https://.../bar?code=ALB-5856
+  try {
+    const url = new URL(text);
+    const code = url.searchParams.get('code');
+
+    if (code) {
+      return code.trim().toUpperCase();
     }
-
-    return decodedText.trim().toUpperCase();
+  } catch {
+    // Provo sotto anche i link senza http/https.
   }
+
+  // Caso 2: QR con URL senza protocollo festa.audaxborgo.it/bar?code=ALB-5856
+  try {
+    const url = new URL(`https://${text}`);
+    const code = url.searchParams.get('code');
+
+    if (code) {
+      return code.trim().toUpperCase();
+    }
+  } catch {
+    // Provo sotto con regex.
+  }
+
+  // Caso 3: qualsiasi testo che contiene code=ALB-5856
+  const codeMatch = text.match(/[?&]code=([^&\s]+)/i);
+
+  if (codeMatch?.[1]) {
+    return decodeURIComponent(codeMatch[1]).trim().toUpperCase();
+  }
+
+  // Caso 4: se il QR contiene già solo ALB-5856
+  const directCodeMatch = text.match(/[A-Z]{3}-[0-9]{4}/i);
+
+  if (directCodeMatch?.[0]) {
+    return directCodeMatch[0].trim().toUpperCase();
+  }
+
+  return text.toUpperCase();
+}
 
   async function startScanner() {
     setError('');
