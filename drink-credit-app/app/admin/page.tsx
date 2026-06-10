@@ -64,6 +64,10 @@ function euro(cents: unknown) {
   return `${(safeNumber(cents) / 100).toFixed(0)} €`;
 }
 
+function cleanUrl(url: string) {
+  return url.replace(/^https?:\/\//, '');
+}
+
 export default function AdminPage() {
   const qrCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -131,12 +135,13 @@ export default function AdminPage() {
 
   function getCreatedWalletUrls() {
     const siteUrl =
-      typeof window !== 'undefined'
-        ? window.location.origin
-        : process.env.NEXT_PUBLIC_SITE_URL || '';
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      (typeof window !== 'undefined' ? window.location.origin : '');
 
-    const walletUrl = `${siteUrl}/wallet/${createdWalletCode}`;
-    const barQrUrl = `${siteUrl}/bar?code=${createdWalletCode}`;
+    const cleanSiteUrl = cleanUrl(siteUrl);
+
+    const walletUrl = `${cleanSiteUrl}/wallet/${createdWalletCode}`;
+    const barQrUrl = `${cleanSiteUrl}/bar?code=${createdWalletCode}`;
 
     const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(
       barQrUrl
@@ -155,14 +160,14 @@ export default function AdminPage() {
     }
 
     const walletNumber = createdWalletCode.split('-')[1];
-    const { walletUrl, qrImageUrl } = getCreatedWalletUrls();
+    const { walletUrl, barQrUrl } = getCreatedWalletUrls();
 
     const whatsappText = encodeURIComponent(
       `🍸 FESTA AUDACE\n` +
         `Il mio codice wallet è ${createdWalletCode}\n` +
         `Numero wallet: ${walletNumber}\n\n` +
         `Link saldo:\n${walletUrl}\n\n` +
-        `QR code da mostrare al bar:\n${qrImageUrl}`
+        `Link QR bar:\n${barQrUrl}`
     );
 
     window.open(`https://wa.me/?text=${whatsappText}`, '_blank');
@@ -671,9 +676,7 @@ export default function AdminPage() {
                         <td>{safeNumber(wallet.paid_credits_available)}</td>
 
                         <td>
-                          <strong>
-                            {safeNumber(wallet.credits_available)}
-                          </strong>
+                          <strong>{safeNumber(wallet.credits_available)}</strong>
                         </td>
 
                         <td>

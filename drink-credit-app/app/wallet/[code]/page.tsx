@@ -52,6 +52,10 @@ function euro(cents: unknown) {
   return `${(safeNumber(cents) / 100).toFixed(0)} €`;
 }
 
+function cleanUrl(url: string) {
+  return url.replace(/^https?:\/\//, '');
+}
+
 export default function WalletPage() {
   const params = useParams<{ code: string }>();
   const code = decodeURIComponent(String(params.code || ''));
@@ -171,12 +175,14 @@ export default function WalletPage() {
   const walletNumber = wallet.pickup_code.split('-')[1];
 
   const siteUrl =
-    typeof window !== 'undefined'
-      ? window.location.origin
-      : process.env.NEXT_PUBLIC_SITE_URL || '';
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (typeof window !== 'undefined' ? window.location.origin : '');
 
-  const walletUrl = `${siteUrl}/wallet/${wallet.pickup_code}`;
-  const barQrUrl = `${siteUrl}/bar?code=${wallet.pickup_code}`;
+  const cleanSiteUrl = cleanUrl(siteUrl);
+
+  const walletUrl = `${cleanSiteUrl}/wallet/${wallet.pickup_code}`;
+  const barQrUrl = `${cleanSiteUrl}/bar?code=${wallet.pickup_code}`;
+
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
     barQrUrl
   )}`;
@@ -186,7 +192,7 @@ export default function WalletPage() {
       `Il mio codice wallet è ${wallet.pickup_code}\n` +
       `Numero wallet: ${walletNumber}\n\n` +
       `Link saldo:\n${walletUrl}\n\n` +
-      `QR code da mostrare al bar:\n${qrImageUrl}`
+      `Link QR bar:\n${barQrUrl}`
   );
 
   const whatsappUrl = `https://wa.me/?text=${whatsappText}`;
