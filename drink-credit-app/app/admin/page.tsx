@@ -166,8 +166,7 @@ export default function AdminPage() {
       `🍸 FESTA AUDACE\n` +
         `Il mio codice wallet è ${createdWalletCode}\n` +
         `Numero wallet: ${walletNumber}\n\n` +
-        `Link saldo:\n${walletUrl}\n\n` +
-        `Link QR bar:\n${barQrUrl}`
+        `Link saldo:\n${walletUrl}\n\n` 
     );
 
     window.open(`https://wa.me/?text=${whatsappText}`, '_blank');
