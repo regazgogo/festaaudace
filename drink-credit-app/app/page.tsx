@@ -66,7 +66,11 @@ export default function HomePage() {
             Numero wallet
             <input
               value={existingWalletNumber}
-              onChange={(event) => setExistingWalletNumber(event.target.value)}
+              onChange={(event) =>
+                setExistingWalletNumber(
+                  event.target.value.replace(/[^0-9]/g, '')
+                )
+              }
               placeholder="Es. 4821"
               inputMode="numeric"
               pattern="[0-9]*"
