@@ -191,8 +191,7 @@ export default function WalletPage() {
     `🍸 FESTA AUDACE\n` +
       `Il mio codice wallet è ${wallet.pickup_code}\n` +
       `Numero wallet: ${walletNumber}\n\n` +
-      `Link saldo:\n${walletUrl}\n\n` +
-      `Link QR bar:\n${barQrUrl}`
+      `Link saldo:\n${walletUrl}\n\n`
   );
 
   const whatsappUrl = `https://wa.me/?text=${whatsappText}`;
