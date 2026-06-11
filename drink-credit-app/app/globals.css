@@ -663,3 +663,35 @@ button:disabled {
     width: 100%;
   }
 }
+.drinkList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.drinkListItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.drinkListItem span {
+  font-weight: 600;
+}
+
+.drinkListItem strong {
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .drinkListItem {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+}

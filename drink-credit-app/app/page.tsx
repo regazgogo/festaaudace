@@ -2,6 +2,22 @@
 
 import { useState } from 'react';
 
+const DRINKS = [
+  { name: 'Gin Tonic Premium', credits: 5 },
+  { name: 'Vodka Redbull', credits: 4 },
+  { name: 'Mojito', credits: 4 },
+  { name: 'Cuba Libre', credits: 4 },
+  { name: 'Gin Tonic', credits: 3 },
+  { name: 'Gin Lemon', credits: 3 },
+  { name: 'Coca Monte', credits: 3 },
+  { name: 'Spritz Aperol', credits: 3 },
+  { name: 'Spritz Campari', credits: 3 },
+  { name: 'Campari Orange', credits: 3 },
+  { name: 'Aperol Cedrata', credits: 3 },
+  { name: 'Amari', credits: 2 },
+  { name: 'Chupito', credits: 1 },
+];
+
 function buildAudaceCode(name: string, walletNumber: string) {
   const cleanName = name
     .trim()
@@ -87,6 +103,19 @@ export default function HomePage() {
 
           <button type="submit">Apri saldo</button>
         </form>
+      </section>
+
+      <section className="card">
+        <h2>Lista drink</h2>
+
+        <div className="drinkList">
+          {DRINKS.map((drink) => (
+            <div className="drinkListItem" key={drink.name}>
+              <span>{drink.name}</span>
+              <strong>{drink.credits} crediti</strong>
+            </div>
+          ))}
+        </div>
       </section>
     </main>
   );
