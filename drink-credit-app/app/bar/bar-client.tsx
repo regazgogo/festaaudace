@@ -65,48 +65,44 @@ export default function BarClient() {
   }, []);
 
   function extractCodeFromQr(decodedText: string) {
-  const text = decodedText.trim();
+    const text = decodedText.trim();
 
-  // Caso 1: QR con URL completo https://.../bar?code=ALB-5856
-  try {
-    const url = new URL(text);
-    const code = url.searchParams.get('code');
+    try {
+      const url = new URL(text);
+      const code = url.searchParams.get('code');
 
-    if (code) {
-      return code.trim().toUpperCase();
+      if (code) {
+        return code.trim().toUpperCase();
+      }
+    } catch {
+      // Provo sotto anche i link senza http/https.
     }
-  } catch {
-    // Provo sotto anche i link senza http/https.
-  }
 
-  // Caso 2: QR con URL senza protocollo festa.audaxborgo.it/bar?code=ALB-5856
-  try {
-    const url = new URL(`https://${text}`);
-    const code = url.searchParams.get('code');
+    try {
+      const url = new URL(`https://${text}`);
+      const code = url.searchParams.get('code');
 
-    if (code) {
-      return code.trim().toUpperCase();
+      if (code) {
+        return code.trim().toUpperCase();
+      }
+    } catch {
+      // Provo sotto con regex.
     }
-  } catch {
-    // Provo sotto con regex.
+
+    const codeMatch = text.match(/[?&]code=([^&\s]+)/i);
+
+    if (codeMatch?.[1]) {
+      return decodeURIComponent(codeMatch[1]).trim().toUpperCase();
+    }
+
+    const directCodeMatch = text.match(/[A-Z]{3}-[0-9]{4}/i);
+
+    if (directCodeMatch?.[0]) {
+      return directCodeMatch[0].trim().toUpperCase();
+    }
+
+    return text.toUpperCase();
   }
-
-  // Caso 3: qualsiasi testo che contiene code=ALB-5856
-  const codeMatch = text.match(/[?&]code=([^&\s]+)/i);
-
-  if (codeMatch?.[1]) {
-    return decodeURIComponent(codeMatch[1]).trim().toUpperCase();
-  }
-
-  // Caso 4: se il QR contiene già solo ALB-5856
-  const directCodeMatch = text.match(/[A-Z]{3}-[0-9]{4}/i);
-
-  if (directCodeMatch?.[0]) {
-    return directCodeMatch[0].trim().toUpperCase();
-  }
-
-  return text.toUpperCase();
-}
 
   async function startScanner() {
     setError('');
@@ -463,6 +459,17 @@ export default function BarClient() {
             >
               <span>SPRITZ FREE</span>
               <strong>-5 FREE</strong>
+            </button>
+
+            <button
+              type="button"
+              className="drinkButton freeDrinkButton"
+              onClick={() => redeemCustomDrink('DRINK FREE', 5)}
+              disabled={wallet.payment_status !== 'paid' || includedBalance < 5}
+            >
+              <span>DRINK FREE</span>
+              <strong>-5 FREE</strong>
+              <small>Massimo 1 volta</small>
             </button>
           </div>
 

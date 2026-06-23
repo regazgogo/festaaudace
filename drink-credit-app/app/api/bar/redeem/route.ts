@@ -2,10 +2,22 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { sendPushoverNotification } from '@/lib/pushover';
 
-function isFreeDrinkName(name: string) {
-  const cleanName = name.trim().toUpperCase();
+function normalizeDrinkName(name: string) {
+  return name.trim().toUpperCase();
+}
 
-  return cleanName === 'BIRRA FREE' || cleanName === 'SPRITZ FREE';
+function isFreeDrinkName(name: string) {
+  const cleanName = normalizeDrinkName(name);
+
+  return (
+    cleanName === 'BIRRA FREE' ||
+    cleanName === 'SPRITZ FREE' ||
+    cleanName === 'DRINK FREE'
+  );
+}
+
+function isLimitedFreeDrink(name: string) {
+  return normalizeDrinkName(name) === 'DRINK FREE';
 }
 
 export async function POST(request: Request) {
@@ -68,6 +80,7 @@ export async function POST(request: Request) {
   }
 
   const isFreeDrink = isFreeDrinkName(drinkName);
+  const isLimitedFree = isLimitedFreeDrink(drinkName);
 
   const { data: paidOrders, error: ordersError } = await supabaseAdmin
     .from('orders')
@@ -92,7 +105,7 @@ export async function POST(request: Request) {
 
   const { data: movements, error: movementsError } = await supabaseAdmin
     .from('credit_movements')
-    .select('type,amount')
+    .select('type,amount,note')
     .in('order_id', orderIds);
 
   if (movementsError) {
@@ -127,6 +140,22 @@ export async function POST(request: Request) {
 
     return total;
   }, 0);
+
+  if (isLimitedFree) {
+    const alreadyUsedLimitedFree = (movements || []).some((movement) => {
+      const type = String(movement.type || '');
+      const note = normalizeDrinkName(String(movement.note || ''));
+
+      return type === 'redeem_free' && note === 'DRINK FREE';
+    });
+
+    if (alreadyUsedLimitedFree) {
+      return NextResponse.json(
+        { error: 'Drink free già utilizzato per questo wallet' },
+        { status: 400 }
+      );
+    }
+  }
 
   if (isFreeDrink && includedBalance < drinkPriceCredits) {
     return NextResponse.json(
