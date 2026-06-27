@@ -6,7 +6,6 @@ const DRINKS = [
   { name: 'Gin Tonic Premium', credits: 5 },
   { name: 'Vodka Redbull', credits: 4 },
   { name: 'Mojito', credits: 4 },
-  { name: 'Cuba Libre', credits: 4 },
   { name: 'Gin Tonic', credits: 3 },
   { name: 'Gin Lemon', credits: 3 },
   { name: 'Coca Monte', credits: 3 },
@@ -15,6 +14,7 @@ const DRINKS = [
   { name: 'Campari Orange', credits: 3 },
   { name: 'Aperol Cedrata', credits: 3 },
   { name: 'Amari', credits: 2 },
+  { name: 'Birra', credits: 2 },
   { name: 'Chupito', credits: 1 },
 ];
 
